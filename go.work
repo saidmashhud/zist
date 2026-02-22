@@ -1,0 +1,12 @@
+go 1.22
+
+use (
+	./services/gateway
+	./services/listings
+	./services/bookings
+	./services/payments
+)
+
+// Resolve the Mashgate SDK local replace directive for all workspace modules.
+// Assumes personal/mashgate and personal/zist are siblings.
+replace github.com/saidmashhud/mashgate/packages/sdk/go => ../mashgate/packages/sdk/go

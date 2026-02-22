@@ -1,0 +1,156 @@
+name: zist
+
+services:
+  # ============================================================================
+  # DATABASE
+  # ============================================================================
+
+  db:
+    image: postgres:16-alpine
+    container_name: zist-db
+    environment:
+      POSTGRES_DB: zist
+      POSTGRES_USER: dev
+      POSTGRES_PASSWORD: dev
+    ports:
+      - "5433:5432"
+    volumes:
+      - zist_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dev -d zist"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - zist-network
+
+  # ============================================================================
+  # GATEWAY  (HTTP/1.1+2 on 8000, HTTP/3/QUIC on 8443)
+  # ============================================================================
+
+  gateway:
+    build:
+      context: ./services/gateway
+    container_name: zist-gateway
+    ports:
+      - "8000:8000"        # HTTP/1.1 + HTTP/2
+      - "8443:8443/udp"    # HTTP/3 (QUIC)
+      - "8443:8443/tcp"    # TLS fallback (Alt-Svc advertisement)
+    environment:
+      GATEWAY_PORT: "8000"
+      GATEWAY_TLS_PORT: "8443"
+      LISTINGS_URL: "http://listings:8001"
+      BOOKINGS_URL: "http://bookings:8002"
+      PAYMENTS_URL: "http://payments:8003"
+      WEB_URL: "http://web:3000"
+    depends_on:
+      - listings
+      - bookings
+      - payments
+      - web
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8000/healthz || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - zist-network
+
+  # ============================================================================
+  # BACKEND SERVICES
+  # ============================================================================
+
+  listings:
+    build:
+      context: ./services/listings
+    container_name: zist-listings
+    environment:
+      LISTINGS_PORT: "8001"
+      DATABASE_URL: "postgres://dev:dev@db:5432/zist?sslmode=disable"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8001/healthz || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - zist-network
+
+  bookings:
+    build:
+      context: ./services/bookings
+    container_name: zist-bookings
+    environment:
+      BOOKINGS_PORT: "8002"
+      DATABASE_URL: "postgres://dev:dev@db:5432/zist?sslmode=disable"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8002/healthz || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - zist-network
+
+  payments:
+    build:
+      # Build context is personal/ root so the Mashgate SDK local replace can be resolved
+      context: ../..
+      dockerfile: zist/services/payments/Dockerfile
+    container_name: zist-payments
+    environment:
+      PAYMENTS_PORT: "8003"
+      # Mashgate runs independently — point to its Envoy gateway
+      MASHGATE_URL: "${MASHGATE_URL:-http://host.docker.internal:9661}"
+      MASHGATE_API_KEY: "${MASHGATE_API_KEY:-}"
+      MASHGATE_WEBHOOK_SECRET: "${MASHGATE_WEBHOOK_SECRET:-}"
+      BOOKINGS_URL: "http://bookings:8002"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8003/healthz || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - zist-network
+
+  # ============================================================================
+  # SVELTEKIT FRONTEND
+  # ============================================================================
+
+  web:
+    build:
+      context: ./apps/web
+    container_name: zist-web
+    environment:
+      PORT: "3000"
+      HOST: "0.0.0.0"
+      # ORIGIN tells SvelteKit where the site lives so SSR fetch() resolves correctly.
+      # For local dev the gateway is at http://gateway:8000 (internal) or http://localhost:8000 (external).
+      ORIGIN: "http://gateway:8000"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    networks:
+      - zist-network
+
+volumes:
+  zist_db_data:
+    name: zist_db_data
+
+networks:
+  zist-network:
+    name: zist_network
+    driver: bridge
