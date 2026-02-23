@@ -19,6 +19,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	mashgate "github.com/saidmashhud/mashgate/packages/sdk/go"
+	zistauth "github.com/saidmashhud/zist/internal/auth"
 )
 
 type server struct {
@@ -40,13 +41,14 @@ func main() {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
+	r.Use(zistauth.Middleware)
 
 	r.Get("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		fmt.Fprint(w, "ok")
 	})
 
-	r.Post("/checkout", s.createCheckout)
+	r.With(zistauth.RequireScope("zist.payments.create")).Post("/checkout", s.createCheckout)
 	r.Post("/webhooks/mashgate", s.handleWebhook)
 
 	slog.Info("Payments service starting", "port", port, "mashgate", mashgateURL, "bookings", bookingsURL)

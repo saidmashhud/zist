@@ -1,7 +1,15 @@
 <script lang="ts">
   import '../app.css';
+  import type { LayoutData } from './$types';
 
-  let { children } = $props();
+  let { children, data }: { children: any; data: LayoutData } = $props();
+
+  const { user } = data;
+
+  async function signOut() {
+    await fetch('/api/auth/logout', { method: 'POST' });
+    window.location.href = '/';
+  }
 </script>
 
 <div class="min-h-screen bg-white">
@@ -22,11 +30,22 @@
       </div>
 
       <div class="flex items-center gap-3">
-        <button
-          class="rounded-full border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-        >
-          Sign in
-        </button>
+        {#if user}
+          <span class="text-sm text-gray-600">{user.email}</span>
+          <button
+            onclick={signOut}
+            class="rounded-full border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          >
+            Sign out
+          </button>
+        {:else}
+          <a
+            href="/api/auth/login"
+            class="rounded-full border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          >
+            Sign in
+          </a>
+        {/if}
       </div>
     </nav>
   </header>

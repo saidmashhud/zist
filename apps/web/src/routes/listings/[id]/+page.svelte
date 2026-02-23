@@ -3,13 +3,12 @@
 
   let { data }: { data: PageData } = $props();
 
-  const { listing } = data;
+  const { listing, user } = data;
 
   // Booking form state
   let checkIn  = $state('');
   let checkOut = $state('');
   let guests   = $state(1);
-  let guestId  = $state('guest-' + Math.random().toString(36).slice(2, 9));
 
   let submitting = $state(false);
   let error      = $state('');
@@ -23,13 +22,12 @@
     submitting = true;
 
     try {
-      // 1. Create booking
+      // 1. Create booking — guestId is set server-side from X-User-ID header
       const bookRes = await fetch('/api/bookings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           listingId: listing.id,
-          guestId,
           checkIn,
           checkOut,
           guests,
@@ -56,7 +54,7 @@
           currency: listing.currency,
           successUrl: `${window.location.origin}/bookings?success=1`,
           cancelUrl: `${window.location.origin}/listings/${listing.id}?cancelled=1`,
-          customerEmail: ''
+          customerEmail: user?.email ?? ''
         })
       });
 
@@ -114,64 +112,76 @@
         {listing.pricePerNight} <span class="text-base font-normal text-gray-500">{listing.currency} / night</span>
       </p>
 
-      <form onsubmit={(e) => { e.preventDefault(); book(); }} class="mt-6 space-y-4">
-        <div class="grid grid-cols-2 gap-3">
-          <div>
-            <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">
-              Check-in
-            </label>
-            <input
-              type="date"
-              bind:value={checkIn}
-              min={new Date().toISOString().slice(0, 10)}
-              required
-              class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-[#ff5a5f] focus:outline-none"
-            />
-          </div>
-          <div>
-            <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">
-              Check-out
-            </label>
-            <input
-              type="date"
-              bind:value={checkOut}
-              min={checkIn || new Date().toISOString().slice(0, 10)}
-              required
-              class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-[#ff5a5f] focus:outline-none"
-            />
-          </div>
-        </div>
-
-        <div>
-          <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">
-            Guests
-          </label>
-          <select
-            bind:value={guests}
-            class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-[#ff5a5f] focus:outline-none"
+      {#if !user}
+        <div class="mt-6 rounded-xl bg-gray-50 p-4 text-center">
+          <p class="text-sm text-gray-600 mb-3">Sign in to book this stay</p>
+          <a
+            href="/api/auth/login"
+            class="inline-block rounded-xl bg-[#ff5a5f] px-6 py-2 text-sm font-semibold text-white hover:bg-[#e84f54] transition-colors"
           >
-            {#each Array.from({ length: listing.maxGuests }, (_, i) => i + 1) as n}
-              <option value={n}>{n} guest{n > 1 ? 's' : ''}</option>
-            {/each}
-          </select>
+            Sign in to book
+          </a>
         </div>
+      {:else}
+        <form onsubmit={(e) => { e.preventDefault(); book(); }} class="mt-6 space-y-4">
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">
+                Check-in
+              </label>
+              <input
+                type="date"
+                bind:value={checkIn}
+                min={new Date().toISOString().slice(0, 10)}
+                required
+                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-[#ff5a5f] focus:outline-none"
+              />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">
+                Check-out
+              </label>
+              <input
+                type="date"
+                bind:value={checkOut}
+                min={checkIn || new Date().toISOString().slice(0, 10)}
+                required
+                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-[#ff5a5f] focus:outline-none"
+              />
+            </div>
+          </div>
 
-        {#if error}
-          <p class="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
-        {/if}
+          <div>
+            <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">
+              Guests
+            </label>
+            <select
+              bind:value={guests}
+              class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-[#ff5a5f] focus:outline-none"
+            >
+              {#each Array.from({ length: listing.maxGuests }, (_, i) => i + 1) as n}
+                <option value={n}>{n} guest{n > 1 ? 's' : ''}</option>
+              {/each}
+            </select>
+          </div>
 
-        <button
-          type="submit"
-          disabled={submitting}
-          class="w-full rounded-xl bg-[#ff5a5f] py-3 text-base font-semibold text-white hover:bg-[#e84f54] transition-colors disabled:opacity-60"
-        >
-          {submitting ? 'Processing…' : 'Reserve & Pay'}
-        </button>
-      </form>
+          {#if error}
+            <p class="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
+          {/if}
 
-      <p class="mt-3 text-center text-xs text-gray-400">
-        You won't be charged yet — payment via Mashgate
-      </p>
+          <button
+            type="submit"
+            disabled={submitting}
+            class="w-full rounded-xl bg-[#ff5a5f] py-3 text-base font-semibold text-white hover:bg-[#e84f54] transition-colors disabled:opacity-60"
+          >
+            {submitting ? 'Processing…' : 'Reserve & Pay'}
+          </button>
+        </form>
+
+        <p class="mt-3 text-center text-xs text-gray-400">
+          You won't be charged yet — payment via Mashgate
+        </p>
+      {/if}
     </div>
   </div>
 </div>

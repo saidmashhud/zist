@@ -1,6 +1,7 @@
 go 1.22
 
 use (
+	./internal/auth
 	./services/gateway
 	./services/listings
 	./services/bookings

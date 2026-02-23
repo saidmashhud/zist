@@ -17,6 +17,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/google/uuid"
 	_ "github.com/lib/pq"
+	zistauth "github.com/saidmashhud/zist/internal/auth"
 )
 
 type Booking struct {
@@ -63,6 +64,7 @@ func main() {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
+	r.Use(zistauth.Middleware)
 
 	r.Get("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -70,8 +72,8 @@ func main() {
 	})
 
 	r.Route("/bookings", func(r chi.Router) {
-		r.Get("/", s.listBookings)
-		r.Post("/", s.createBooking)
+		r.With(zistauth.RequireScope("zist.bookings.read")).Get("/", s.listBookings)
+		r.With(zistauth.RequireScope("zist.bookings.manage")).Post("/", s.createBooking)
 		r.Get("/{id}", s.getBooking)
 		r.Post("/{id}/cancel", s.cancelBooking)
 		r.Post("/{id}/confirm", s.confirmBooking)
@@ -105,7 +107,13 @@ func migrate(db *sql.DB) error {
 }
 
 func (s *server) listBookings(w http.ResponseWriter, r *http.Request) {
-	guestID := r.URL.Query().Get("guestId")
+	// List only the authenticated user's own bookings
+	principal := zistauth.FromContext(r.Context())
+	guestID := ""
+	if principal != nil {
+		guestID = principal.UserID
+	}
+
 	var rows *sql.Rows
 	var err error
 
@@ -143,7 +151,6 @@ func (s *server) listBookings(w http.ResponseWriter, r *http.Request) {
 func (s *server) createBooking(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		ListingID   string `json:"listingId"`
-		GuestID     string `json:"guestId"`
 		CheckIn     string `json:"checkIn"`
 		CheckOut    string `json:"checkOut"`
 		Guests      int    `json:"guests"`
@@ -154,16 +161,24 @@ func (s *server) createBooking(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
-	if req.ListingID == "" || req.GuestID == "" || req.CheckIn == "" || req.CheckOut == "" {
-		writeError(w, http.StatusUnprocessableEntity, "listingId, guestId, checkIn, checkOut are required")
+	if req.ListingID == "" || req.CheckIn == "" || req.CheckOut == "" {
+		writeError(w, http.StatusUnprocessableEntity, "listingId, checkIn, checkOut are required")
 		return
 	}
+
+	// GuestID is set from the authenticated principal — not from the request body
+	principal := zistauth.FromContext(r.Context())
+	if principal == nil {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	guestID := principal.UserID
 
 	now := time.Now().Unix()
 	b := Booking{
 		ID:          uuid.NewString(),
 		ListingID:   req.ListingID,
-		GuestID:     req.GuestID,
+		GuestID:     guestID,
 		CheckIn:     req.CheckIn,
 		CheckOut:    req.CheckOut,
 		Guests:      req.Guests,

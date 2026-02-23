@@ -43,11 +43,20 @@ services:
       BOOKINGS_URL: "http://bookings:8002"
       PAYMENTS_URL: "http://payments:8003"
       WEB_URL: "http://web:3000"
+      # mgID OAuth2/OIDC integration — set these in .env or override here
+      MGID_URL: "${MGID_URL:-http://host.docker.internal:9661}"
+      MGID_CLIENT_ID: "${MGID_CLIENT_ID:-zist-local}"
+      MGID_CLIENT_SECRET: "${MGID_CLIENT_SECRET:-}"
+      MGID_REDIRECT_URI: "${MGID_REDIRECT_URI:-http://localhost:8000/api/auth/callback}"
+      MGID_ADMIN_TOKEN: "${MGID_ADMIN_TOKEN:-}"
+      SESSION_SECRET: "${SESSION_SECRET:-change-me-in-production}"
     depends_on:
       - listings
       - bookings
       - payments
       - web
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8000/healthz || exit 1"]
