@@ -21,17 +21,18 @@ import (
 )
 
 type Booking struct {
-	ID          string `json:"id"`
-	ListingID   string `json:"listingId"`
-	GuestID     string `json:"guestId"`
-	CheckIn     string `json:"checkIn"`  // YYYY-MM-DD
-	CheckOut    string `json:"checkOut"` // YYYY-MM-DD
-	Guests      int    `json:"guests"`
-	TotalAmount string `json:"totalAmount"` // decimal string
-	Currency    string `json:"currency"`
-	Status      string `json:"status"` // pending | confirmed | cancelled
-	CreatedAt   int64  `json:"createdAt"`
-	UpdatedAt   int64  `json:"updatedAt"`
+	ID          string  `json:"id"`
+	ListingID   string  `json:"listingId"`
+	GuestID     string  `json:"guestId"`
+	CheckIn     string  `json:"checkIn"`  // YYYY-MM-DD
+	CheckOut    string  `json:"checkOut"` // YYYY-MM-DD
+	Guests      int     `json:"guests"`
+	TotalAmount string  `json:"totalAmount"` // decimal string
+	Currency    string  `json:"currency"`
+	Status      string  `json:"status"`               // pending | confirmed | cancelled | failed
+	CheckoutID  *string `json:"checkoutId,omitempty"` // Mashgate checkout session ID
+	CreatedAt   int64   `json:"createdAt"`
+	UpdatedAt   int64   `json:"updatedAt"`
 }
 
 type server struct {
@@ -77,6 +78,8 @@ func main() {
 		r.Get("/{id}", s.getBooking)
 		r.Post("/{id}/cancel", s.cancelBooking)
 		r.Post("/{id}/confirm", s.confirmBooking)
+		r.Post("/{id}/fail", s.failBooking)
+		r.Put("/{id}/checkout", s.setCheckoutID)
 	})
 
 	slog.Info("Bookings service starting", "port", port)
@@ -98,10 +101,29 @@ func migrate(db *sql.DB) error {
 			total_amount TEXT NOT NULL,
 			currency     TEXT NOT NULL DEFAULT 'USD',
 			status       TEXT NOT NULL DEFAULT 'pending'
-			             CHECK (status IN ('pending','confirmed','cancelled')),
+			             CHECK (status IN ('pending','confirmed','cancelled','failed')),
+			checkout_id  TEXT,
 			created_at   BIGINT NOT NULL,
 			updated_at   BIGINT NOT NULL
 		)
+	`)
+	if err != nil {
+		return err
+	}
+	// Idempotent migration: add checkout_id column if it doesn't exist yet
+	// (for databases created with the old schema).
+	_, err = db.Exec(`
+		ALTER TABLE bookings ADD COLUMN IF NOT EXISTS checkout_id TEXT
+	`)
+	if err != nil {
+		return err
+	}
+	// Extend status CHECK constraint to include 'failed'.
+	// DROP + re-add is idempotent because the constraint name is fixed.
+	_, _ = db.Exec(`ALTER TABLE bookings DROP CONSTRAINT IF EXISTS bookings_status_check`)
+	_, err = db.Exec(`
+		ALTER TABLE bookings ADD CONSTRAINT bookings_status_check
+		CHECK (status IN ('pending','confirmed','cancelled','failed'))
 	`)
 	return err
 }
@@ -119,11 +141,11 @@ func (s *server) listBookings(w http.ResponseWriter, r *http.Request) {
 
 	if guestID != "" {
 		rows, err = s.db.QueryContext(r.Context(),
-			`SELECT id, listing_id, guest_id, check_in::text, check_out::text, guests, total_amount, currency, status, created_at, updated_at
+			`SELECT id, listing_id, guest_id, check_in::text, check_out::text, guests, total_amount, currency, status, checkout_id, created_at, updated_at
 			 FROM bookings WHERE guest_id = $1 ORDER BY created_at DESC LIMIT 50`, guestID)
 	} else {
 		rows, err = s.db.QueryContext(r.Context(),
-			`SELECT id, listing_id, guest_id, check_in::text, check_out::text, guests, total_amount, currency, status, created_at, updated_at
+			`SELECT id, listing_id, guest_id, check_in::text, check_out::text, guests, total_amount, currency, status, checkout_id, created_at, updated_at
 			 FROM bookings ORDER BY created_at DESC LIMIT 50`)
 	}
 	if err != nil {
@@ -136,7 +158,7 @@ func (s *server) listBookings(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var b Booking
 		if err := rows.Scan(&b.ID, &b.ListingID, &b.GuestID, &b.CheckIn, &b.CheckOut,
-			&b.Guests, &b.TotalAmount, &b.Currency, &b.Status, &b.CreatedAt, &b.UpdatedAt); err != nil {
+			&b.Guests, &b.TotalAmount, &b.Currency, &b.Status, &b.CheckoutID, &b.CreatedAt, &b.UpdatedAt); err != nil {
 			writeError(w, http.StatusInternalServerError, "scan failed")
 			return
 		}
@@ -204,10 +226,10 @@ func (s *server) getBooking(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	var b Booking
 	err := s.db.QueryRowContext(r.Context(),
-		`SELECT id, listing_id, guest_id, check_in::text, check_out::text, guests, total_amount, currency, status, created_at, updated_at
+		`SELECT id, listing_id, guest_id, check_in::text, check_out::text, guests, total_amount, currency, status, checkout_id, created_at, updated_at
 		 FROM bookings WHERE id = $1`, id).
 		Scan(&b.ID, &b.ListingID, &b.GuestID, &b.CheckIn, &b.CheckOut,
-			&b.Guests, &b.TotalAmount, &b.Currency, &b.Status, &b.CreatedAt, &b.UpdatedAt)
+			&b.Guests, &b.TotalAmount, &b.Currency, &b.Status, &b.CheckoutID, &b.CreatedAt, &b.UpdatedAt)
 	if err == sql.ErrNoRows {
 		writeError(w, http.StatusNotFound, "booking not found")
 		return
@@ -250,6 +272,56 @@ func (s *server) cancelBooking(w http.ResponseWriter, r *http.Request) {
 	rows, _ := result.RowsAffected()
 	if rows == 0 {
 		writeError(w, http.StatusNotFound, "booking not found or already cancelled")
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// failBooking marks a booking as failed (called by payments service on payment.failed).
+func (s *server) failBooking(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	now := time.Now().Unix()
+	result, err := s.db.ExecContext(r.Context(),
+		`UPDATE bookings SET status='failed', updated_at=$1 WHERE id=$2 AND status='pending'`,
+		now, id)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "update failed")
+		return
+	}
+	rows, _ := result.RowsAffected()
+	if rows == 0 {
+		writeError(w, http.StatusNotFound, "booking not found or not pending")
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// setCheckoutID stores the Mashgate checkout session ID on the booking.
+// Called by the payments service after creating a checkout session.
+func (s *server) setCheckoutID(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	var req struct {
+		CheckoutID string `json:"checkoutId"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if req.CheckoutID == "" {
+		writeError(w, http.StatusUnprocessableEntity, "checkoutId is required")
+		return
+	}
+	now := time.Now().Unix()
+	result, err := s.db.ExecContext(r.Context(),
+		`UPDATE bookings SET checkout_id=$1, updated_at=$2 WHERE id=$3`,
+		req.CheckoutID, now, id)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "update failed")
+		return
+	}
+	rows, _ := result.RowsAffected()
+	if rows == 0 {
+		writeError(w, http.StatusNotFound, "booking not found")
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
