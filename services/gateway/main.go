@@ -51,6 +51,8 @@ func main() {
 	clientSecret := getenv("MGID_CLIENT_SECRET", "")
 	redirectURI := getenv("MGID_REDIRECT_URI", "http://localhost:8000/api/auth/callback")
 	mgIDAdminToken := getenv("MGID_ADMIN_TOKEN", "")
+	hooklineURL := getenv("HOOKLINE_URL", "http://hookline:8080")
+	hooklineKey := getenv("HOOKLINE_API_KEY", "dev-secret")
 
 	oidcCfg := oidcConfig{
 		mgIDURL:      mgIDURL,
@@ -89,6 +91,11 @@ func main() {
 	mountAPI(r, "listings", proxyTo(listingsURL))
 	mountAPI(r, "bookings", proxyTo(bookingsURL))
 	mountAPI(r, "payments", proxyTo(paymentsURL))
+
+	// Admin webhook management — proxied to HookLine with API key injection.
+	// Requires zist.webhooks.manage scope (enforced at gateway level).
+	r.Handle("/api/admin/webhooks", adminWebhookProxy(hooklineURL, hooklineKey))
+	r.Handle("/api/admin/webhooks/*", adminWebhookProxy(hooklineURL, hooklineKey))
 
 	// SvelteKit frontend — catch-all (all non-API routes)
 	r.Mount("/", proxyTo(webURL))
@@ -192,6 +199,32 @@ func selfSignedCert() (tls.Certificate, error) {
 	keyPEM  := pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: keyDER})
 
 	return tls.X509KeyPair(certPEM, keyPEM)
+}
+
+// adminWebhookProxy creates a reverse proxy to HookLine that:
+//   - strips /api/admin/webhooks prefix → /v1/... (HookLine native paths)
+//   - injects the HookLine API key as Authorization header
+func adminWebhookProxy(hooklineURL, hooklineKey string) http.Handler {
+	u, err := url.Parse(hooklineURL)
+	if err != nil {
+		panic(fmt.Sprintf("invalid hookline URL %q: %v", hooklineURL, err))
+	}
+	proxy := httputil.NewSingleHostReverseProxy(u)
+	proxy.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
+		slog.Warn("hookline proxy error", "path", r.URL.Path, "err", err)
+		http.Error(w, "webhook service unavailable", http.StatusBadGateway)
+	}
+	stripped := http.StripPrefix("/api/admin/webhooks", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Map /endpoints/... → /v1/endpoints/...
+		if r.URL.Path == "" || r.URL.Path == "/" {
+			r.URL.Path = "/v1/endpoints"
+		} else {
+			r.URL.Path = "/v1" + r.URL.Path
+		}
+		r.Header.Set("Authorization", "Bearer "+hooklineKey)
+		proxy.ServeHTTP(w, r)
+	}))
+	return stripped
 }
 
 func getenv(key, fallback string) string {

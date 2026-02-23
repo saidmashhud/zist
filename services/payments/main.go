@@ -8,6 +8,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -72,7 +73,7 @@ func main() {
 //	  "customerEmail": "guest@example.com"
 //	}
 //
-// Response: { "checkoutUrl": "https://..." }
+// Response: { "sessionId": "...", "checkoutUrl": "https://..." }
 func (s *server) createCheckout(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		ListingID     string `json:"listingId"`
@@ -92,6 +93,12 @@ func (s *server) createCheckout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Use bookingId as the idempotency key so duplicate requests return the same session.
+	idempotencyKey := req.BookingID
+	if idempotencyKey == "" {
+		idempotencyKey = "" // SDK will generate a UUID if empty
+	}
+
 	session, err := s.mg.CreateCheckout(r.Context(), mashgate.CreateCheckoutRequest{
 		TotalAmount: mashgate.Money{
 			Amount:   req.Amount,
@@ -107,9 +114,10 @@ func (s *server) createCheckout(w http.ResponseWriter, r *http.Request) {
 				},
 			},
 		},
-		CustomerEmail: req.CustomerEmail,
-		SuccessURL:    req.SuccessURL,
-		CancelURL:     req.CancelURL,
+		CustomerEmail:  req.CustomerEmail,
+		SuccessURL:     req.SuccessURL,
+		CancelURL:      req.CancelURL,
+		IdempotencyKey: idempotencyKey,
 		Metadata: map[string]string{
 			"bookingId": req.BookingID,
 			"listingId": req.ListingID,
@@ -119,6 +127,14 @@ func (s *server) createCheckout(w http.ResponseWriter, r *http.Request) {
 		slog.Error("Mashgate CreateCheckout failed", "err", err)
 		writeError(w, http.StatusBadGateway, "payment gateway error")
 		return
+	}
+
+	// Persist the checkout session ID on the booking so it can be looked up later.
+	if req.BookingID != "" {
+		if err := s.setBookingCheckoutID(r.Context(), req.BookingID, session.SessionID); err != nil {
+			slog.Warn("failed to store checkout_id on booking", "bookingId", req.BookingID, "err", err)
+			// Non-fatal: checkout session was created successfully.
+		}
 	}
 
 	writeJSON(w, http.StatusCreated, map[string]string{
@@ -181,6 +197,18 @@ func (s *server) handleWebhook(w http.ResponseWriter, r *http.Request) {
 
 	case mashgate.EventPaymentFailed, mashgate.EventPaymentCaptureFailed:
 		slog.Warn("payment failed", "paymentId", event.AggregateID)
+		var payload struct {
+			Metadata map[string]string `json:"metadata"`
+		}
+		if err := json.Unmarshal(event.Data, &payload); err == nil {
+			if bookingID := payload.Metadata["bookingId"]; bookingID != "" {
+				if err := s.failBooking(r.Context(), bookingID); err != nil {
+					slog.Error("failed to mark booking as failed", "bookingId", bookingID, "err", err)
+				} else {
+					slog.Info("booking marked as failed", "bookingId", bookingID)
+				}
+			}
+		}
 
 	case mashgate.EventCheckoutCompleted:
 		slog.Info("checkout completed", "sessionId", event.AggregateID)
@@ -203,6 +231,45 @@ func (s *server) confirmBooking(ctx context.Context, bookingID string) error {
 	if err != nil {
 		return err
 	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusNoContent {
+		return fmt.Errorf("bookings service returned %d", resp.StatusCode)
+	}
+	return nil
+}
+
+// failBooking calls the bookings service to mark a booking as failed.
+func (s *server) failBooking(ctx context.Context, bookingID string) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
+		s.bookingsURL+"/bookings/"+bookingID+"/fail", nil)
+	if err != nil {
+		return err
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusNoContent {
+		return fmt.Errorf("bookings service returned %d", resp.StatusCode)
+	}
+	return nil
+}
+
+// setBookingCheckoutID persists the Mashgate checkout session ID on the booking.
+func (s *server) setBookingCheckoutID(ctx context.Context, bookingID, checkoutID string) error {
+	body, _ := json.Marshal(map[string]string{"checkoutId": checkoutID})
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut,
+		s.bookingsURL+"/bookings/"+bookingID+"/checkout",
+		bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return err
