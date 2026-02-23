@@ -7,6 +7,7 @@
 // Advertises HTTP/3 via Alt-Svc header on every HTTP/1.1 response.
 // Routes:
 //
+//	/api/auth/*      → mgID OIDC flow (login, callback, logout, me)
 //	/api/listings/*  → listings service  (strips /api prefix)
 //	/api/bookings/*  → bookings service  (strips /api prefix)
 //	/api/payments/*  → payments service  (strips /api prefix)
@@ -45,6 +46,19 @@ func main() {
 	paymentsURL := getenv("PAYMENTS_URL", "http://payments:8003")
 	webURL      := getenv("WEB_URL", "http://web:3000")
 
+	mgIDURL     := getenv("MGID_URL", "http://host.docker.internal:9661")
+	clientID    := getenv("MGID_CLIENT_ID", "zist-local")
+	clientSecret := getenv("MGID_CLIENT_SECRET", "")
+	redirectURI := getenv("MGID_REDIRECT_URI", "http://localhost:8000/api/auth/callback")
+	mgIDAdminToken := getenv("MGID_ADMIN_TOKEN", "")
+
+	oidcCfg := oidcConfig{
+		mgIDURL:      mgIDURL,
+		clientID:     clientID,
+		clientSecret: clientSecret,
+		redirectURI:  redirectURI,
+	}
+
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
@@ -59,9 +73,16 @@ func main() {
 		})
 	})
 
+	// Auth propagation: validate session cookie → inject X-User-* headers
+	// Runs on all /api/* requests (strips injection, sets headers from mgID).
+	r.Use(propagateAuth(mgIDURL, sessionCookieName))
+
 	r.Get("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprint(w, "ok")
 	})
+
+	// OIDC auth routes (handled locally, not proxied)
+	mountOIDC(r, oidcCfg)
 
 	// API routes — /api prefix is stripped before forwarding so upstreams
 	// see their own path space: /listings/*, /bookings/*, /payments/*
@@ -71,6 +92,9 @@ func main() {
 
 	// SvelteKit frontend — catch-all (all non-API routes)
 	r.Mount("/", proxyTo(webURL))
+
+	// Register Zist's app-scoped permissions with mgID (idempotent)
+	go registerZistScopes(mgIDURL, clientID, mgIDAdminToken)
 
 	// Generate ephemeral self-signed TLS cert for HTTP/3 (local dev only)
 	cert, err := selfSignedCert()
@@ -93,6 +117,7 @@ func main() {
 	slog.Info("Zist gateway starting",
 		"http", ":"+httpPort,
 		"http3/quic", ":"+tlsPort,
+		"mgid", mgIDURL,
 	)
 
 	// HTTP/3 (UDP) in background

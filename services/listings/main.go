@@ -17,6 +17,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/google/uuid"
 	_ "github.com/lib/pq"
+	zistauth "github.com/saidmashhud/zist/internal/auth"
 )
 
 type Listing struct {
@@ -63,6 +64,7 @@ func main() {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
+	r.Use(zistauth.Middleware)
 
 	r.Get("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -70,11 +72,11 @@ func main() {
 	})
 
 	r.Route("/listings", func(r chi.Router) {
-		r.Get("/", s.listListings)
-		r.Post("/", s.createListing)
-		r.Get("/{id}", s.getListing)
-		r.Put("/{id}", s.updateListing)
-		r.Delete("/{id}", s.deleteListing)
+		r.Get("/", s.listListings)   // public
+		r.Get("/{id}", s.getListing) // public
+		r.With(zistauth.RequireAuth, zistauth.RequireScope("zist.listings.manage")).Post("/", s.createListing)
+		r.With(zistauth.RequireAuth, zistauth.RequireScope("zist.listings.manage")).Put("/{id}", s.updateListing)
+		r.With(zistauth.RequireAuth, zistauth.RequireScope("zist.listings.manage")).Delete("/{id}", s.deleteListing)
 	})
 
 	slog.Info("Listings service starting", "port", port)

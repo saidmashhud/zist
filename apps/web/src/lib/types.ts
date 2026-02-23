@@ -30,3 +30,12 @@ export interface CheckoutResult {
   sessionId: string;
   checkoutUrl: string;
 }
+
+export interface User {
+  sub: string;
+  email: string;
+  name?: string;
+  tenant_id: string;
+  roles: string[];
+  scope: string;
+}
