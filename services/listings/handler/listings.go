@@ -68,6 +68,10 @@ func (h *Handler) GetListing(w http.ResponseWriter, r *http.Request) {
 	if photos != nil {
 		l.Photos = photos
 	}
+
+	// Analytics: track listing view for host dashboard.
+	h.Analytics.TrackListingView(r.Context(), tenantID, id, l.HostID)
+
 	httputil.WriteJSON(w, http.StatusOK, l)
 }
 

@@ -1,7 +1,12 @@
 /**
  * Shared test fixture data for the mock gateway.
- * All monetary values are in UZS (Uzbekistani Som).
+ * Covers all Central Asian countries and currencies.
  */
+
+// ---------------------------------------------------------------------------
+// Listings — host-001 owns listing-001..006, 015 (HOST_OWN_LISTINGS)
+//            host-002 owns listing-007..014
+// ---------------------------------------------------------------------------
 
 export const LISTING_TASHKENT = {
   id: 'listing-001',
@@ -21,6 +26,8 @@ export const LISTING_TASHKENT = {
   beds: 2,
   bathrooms: 1,
   minNights: 1,
+  maxNights: 30,
+  cleaningFee: '30000',
   amenities: ['wifi', 'kitchen', 'ac'],
   cancellationPolicy: 'flexible',
   rules: {
@@ -32,7 +39,7 @@ export const LISTING_TASHKENT = {
     pets: true,
     parties: false,
   },
-  photos: [],
+  photos: [{ id: 'photo-001', url: 'https://example.com/tashkent-apt.jpg', caption: 'Living room' }],
   averageRating: 4.8,
   reviewCount: 12,
 };
@@ -55,6 +62,8 @@ export const LISTING_SAMARKAND = {
   beds: 4,
   bathrooms: 2,
   minNights: 2,
+  maxNights: 14,
+  cleaningFee: '40000',
   amenities: ['wifi', 'kitchen', 'ac', 'parking'],
   cancellationPolicy: 'moderate',
   rules: null,
@@ -81,6 +90,8 @@ export const LISTING_PAUSED = {
   beds: 1,
   bathrooms: 1,
   minNights: 1,
+  maxNights: 30,
+  cleaningFee: '20000',
   amenities: ['wifi'],
   cancellationPolicy: 'strict',
   rules: null,
@@ -89,8 +100,359 @@ export const LISTING_PAUSED = {
   reviewCount: 3,
 };
 
-export const ALL_LISTINGS = [LISTING_TASHKENT, LISTING_SAMARKAND, LISTING_PAUSED];
-export const HOST_OWN_LISTINGS = [LISTING_TASHKENT, LISTING_SAMARKAND, LISTING_PAUSED];
+const LISTING_004 = {
+  id: 'listing-004',
+  hostId: 'host-001',
+  title: 'Tashkent Modern Room',
+  type: 'room',
+  city: 'Tashkent',
+  country: 'Uzbekistan',
+  address: 'Yunusabad 22',
+  description: 'Modern private room in a quiet Tashkent neighbourhood.',
+  pricePerNight: '100000',
+  currency: 'UZS',
+  status: 'active',
+  instantBook: false,
+  maxGuests: 2,
+  bedrooms: 1,
+  beds: 1,
+  bathrooms: 1,
+  minNights: 1,
+  maxNights: 30,
+  cleaningFee: '15000',
+  amenities: ['wifi', 'ac'],
+  cancellationPolicy: 'flexible',
+  rules: null,
+  photos: [],
+  averageRating: 4.2,
+  reviewCount: 5,
+};
+
+const LISTING_005 = {
+  id: 'listing-005',
+  hostId: 'host-001',
+  title: 'Fergana Valley House',
+  type: 'house',
+  city: 'Fergana',
+  country: 'Uzbekistan',
+  address: 'Mustaqillik 8',
+  description: 'Spacious house in the fertile Fergana Valley.',
+  pricePerNight: '180000',
+  currency: 'UZS',
+  status: 'active',
+  instantBook: true,
+  maxGuests: 8,
+  bedrooms: 4,
+  beds: 5,
+  bathrooms: 2,
+  minNights: 2,
+  maxNights: 30,
+  cleaningFee: '35000',
+  amenities: ['wifi', 'kitchen', 'parking'],
+  cancellationPolicy: 'moderate',
+  rules: null,
+  photos: [],
+  averageRating: 4.6,
+  reviewCount: 8,
+};
+
+const LISTING_006 = {
+  id: 'listing-006',
+  hostId: 'host-001',
+  title: 'Samarkand Garden Apartment',
+  type: 'apartment',
+  city: 'Samarkand',
+  country: 'Uzbekistan',
+  address: 'Shah-i-Zinda 3',
+  description: 'Bright apartment with a garden view near the mausoleums.',
+  pricePerNight: '160000',
+  currency: 'UZS',
+  status: 'active',
+  instantBook: false,
+  maxGuests: 3,
+  bedrooms: 2,
+  beds: 2,
+  bathrooms: 1,
+  minNights: 1,
+  maxNights: 21,
+  cleaningFee: '25000',
+  amenities: ['wifi', 'kitchen', 'ac'],
+  cancellationPolicy: 'flexible',
+  rules: null,
+  photos: [],
+  averageRating: 4.4,
+  reviewCount: 7,
+};
+
+const LISTING_007 = {
+  id: 'listing-007',
+  hostId: 'host-002',
+  title: 'Bukhara Heritage Room',
+  type: 'room',
+  city: 'Bukhara',
+  country: 'Uzbekistan',
+  address: 'Kalon Minaret 7',
+  description: 'Heritage room inside a restored caravanserai.',
+  pricePerNight: '130000',
+  currency: 'UZS',
+  status: 'paused',
+  instantBook: false,
+  maxGuests: 2,
+  bedrooms: 1,
+  beds: 1,
+  bathrooms: 1,
+  minNights: 1,
+  maxNights: 14,
+  cleaningFee: '20000',
+  amenities: ['wifi'],
+  cancellationPolicy: 'strict',
+  rules: null,
+  photos: [],
+  averageRating: 4.7,
+  reviewCount: 15,
+};
+
+const LISTING_008 = {
+  id: 'listing-008',
+  hostId: 'host-002',
+  title: 'Almaty Mountain Lodge',
+  type: 'house',
+  city: 'Almaty',
+  country: 'Kazakhstan',
+  address: 'Medeu 1',
+  description: 'Cosy lodge at the foot of the Tian Shan mountains.',
+  pricePerNight: '45000',
+  currency: 'KZT',
+  status: 'active',
+  instantBook: false,
+  maxGuests: 6,
+  bedrooms: 3,
+  beds: 4,
+  bathrooms: 2,
+  minNights: 2,
+  maxNights: 30,
+  cleaningFee: '8000',
+  amenities: ['wifi', 'kitchen', 'parking'],
+  cancellationPolicy: 'moderate',
+  rules: null,
+  photos: [],
+  averageRating: 4.9,
+  reviewCount: 22,
+};
+
+const LISTING_009 = {
+  id: 'listing-009',
+  hostId: 'host-002',
+  title: 'Almaty City Apartment',
+  type: 'apartment',
+  city: 'Almaty',
+  country: 'Kazakhstan',
+  address: 'Dostyk Ave 100',
+  description: 'Central apartment in the heart of Almaty.',
+  pricePerNight: '35000',
+  currency: 'KZT',
+  status: 'active',
+  instantBook: true,
+  maxGuests: 4,
+  bedrooms: 2,
+  beds: 2,
+  bathrooms: 1,
+  minNights: 1,
+  maxNights: 30,
+  cleaningFee: '5000',
+  amenities: ['wifi', 'kitchen', 'ac'],
+  cancellationPolicy: 'flexible',
+  rules: null,
+  photos: [],
+  averageRating: 4.5,
+  reviewCount: 18,
+};
+
+const LISTING_010 = {
+  id: 'listing-010',
+  hostId: 'host-002',
+  title: 'Astana Business Apartment',
+  type: 'apartment',
+  city: 'Astana',
+  country: 'Kazakhstan',
+  address: 'Nurzhol Blvd 5',
+  description: 'Modern apartment in Astana\'s financial district.',
+  pricePerNight: '50000',
+  currency: 'KZT',
+  status: 'active',
+  instantBook: false,
+  maxGuests: 3,
+  bedrooms: 1,
+  beds: 2,
+  bathrooms: 1,
+  minNights: 1,
+  maxNights: 30,
+  cleaningFee: '6000',
+  amenities: ['wifi', 'ac', 'kitchen'],
+  cancellationPolicy: 'moderate',
+  rules: null,
+  photos: [],
+  averageRating: 4.3,
+  reviewCount: 9,
+};
+
+const LISTING_011 = {
+  id: 'listing-011',
+  hostId: 'host-002',
+  title: 'Bishkek Cozy Studio',
+  type: 'apartment',
+  city: 'Bishkek',
+  country: 'Kyrgyzstan',
+  address: 'Erkindik Blvd 20',
+  description: 'Compact studio in central Bishkek.',
+  pricePerNight: '3500',
+  currency: 'KGS',
+  status: 'active',
+  instantBook: true,
+  maxGuests: 2,
+  bedrooms: 1,
+  beds: 1,
+  bathrooms: 1,
+  minNights: 1,
+  maxNights: 30,
+  cleaningFee: '500',
+  amenities: ['wifi', 'ac'],
+  cancellationPolicy: 'flexible',
+  rules: null,
+  photos: [],
+  averageRating: 4.1,
+  reviewCount: 6,
+};
+
+const LISTING_012 = {
+  id: 'listing-012',
+  hostId: 'host-002',
+  title: 'Bishkek Mountain Cabin',
+  type: 'guesthouse',
+  city: 'Bishkek',
+  country: 'Kyrgyzstan',
+  address: 'Ala-Archa 3',
+  description: 'Rustic cabin with views of the Kyrgyz mountains.',
+  pricePerNight: '5000',
+  currency: 'KGS',
+  status: 'active',
+  instantBook: false,
+  maxGuests: 4,
+  bedrooms: 2,
+  beds: 3,
+  bathrooms: 1,
+  minNights: 2,
+  maxNights: 14,
+  cleaningFee: '800',
+  amenities: ['wifi', 'kitchen'],
+  cancellationPolicy: 'moderate',
+  rules: null,
+  photos: [],
+  averageRating: 4.7,
+  reviewCount: 11,
+};
+
+const LISTING_013 = {
+  id: 'listing-013',
+  hostId: 'host-002',
+  title: 'Dushanbe Heritage Guesthouse',
+  type: 'guesthouse',
+  city: 'Dushanbe',
+  country: 'Tajikistan',
+  address: 'Rudaki Ave 14',
+  description: 'Traditional guesthouse on Dushanbe\'s main boulevard.',
+  pricePerNight: '280',
+  currency: 'TJS',
+  status: 'active',
+  instantBook: false,
+  maxGuests: 3,
+  bedrooms: 2,
+  beds: 2,
+  bathrooms: 1,
+  minNights: 1,
+  maxNights: 30,
+  cleaningFee: '40',
+  amenities: ['wifi', 'kitchen'],
+  cancellationPolicy: 'flexible',
+  rules: null,
+  photos: [],
+  averageRating: 4.4,
+  reviewCount: 4,
+};
+
+const LISTING_014 = {
+  id: 'listing-014',
+  hostId: 'host-002',
+  title: 'Ashgabat Modern Apartment',
+  type: 'apartment',
+  city: 'Ashgabat',
+  country: 'Turkmenistan',
+  address: 'Bitarap Turkmenistan 8',
+  description: 'Sleek apartment in the marble city of Ashgabat.',
+  pricePerNight: '750',
+  currency: 'TMT',
+  status: 'active',
+  instantBook: false,
+  maxGuests: 4,
+  bedrooms: 2,
+  beds: 2,
+  bathrooms: 1,
+  minNights: 2,
+  maxNights: 30,
+  cleaningFee: '100',
+  amenities: ['wifi', 'ac', 'kitchen'],
+  cancellationPolicy: 'moderate',
+  rules: null,
+  photos: [],
+  averageRating: 4.6,
+  reviewCount: 7,
+};
+
+const LISTING_015 = {
+  id: 'listing-015',
+  hostId: 'host-001',
+  title: 'Tashkent Luxury Penthouse',
+  type: 'apartment',
+  city: 'Tashkent',
+  country: 'Uzbekistan',
+  address: 'Shaykhantahur 1',
+  description: 'Top-floor penthouse with panoramic city views.',
+  pricePerNight: '600000',
+  currency: 'UZS',
+  status: 'active',
+  instantBook: true,
+  maxGuests: 6,
+  bedrooms: 3,
+  beds: 3,
+  bathrooms: 2,
+  minNights: 2,
+  maxNights: 30,
+  cleaningFee: '80000',
+  amenities: ['wifi', 'kitchen', 'ac', 'parking'],
+  cancellationPolicy: 'strict',
+  rules: null,
+  photos: [],
+  averageRating: 4.9,
+  reviewCount: 3,
+};
+
+/** All 15 listings (used by search and featured). */
+export const ALL_LISTINGS = [
+  LISTING_TASHKENT, LISTING_SAMARKAND, LISTING_PAUSED,
+  LISTING_004, LISTING_005, LISTING_006, LISTING_007,
+  LISTING_008, LISTING_009, LISTING_010, LISTING_011,
+  LISTING_012, LISTING_013, LISTING_014, LISTING_015,
+];
+
+/** 7 listings owned by host-001 (test host). */
+export const HOST_OWN_LISTINGS = [
+  LISTING_TASHKENT, LISTING_SAMARKAND, LISTING_PAUSED,
+  LISTING_004, LISTING_005, LISTING_006, LISTING_015,
+];
+
+// ---------------------------------------------------------------------------
+// Bookings
+// ---------------------------------------------------------------------------
 
 export const BOOKING_PENDING = {
   id: 'booking-001',
@@ -155,8 +517,276 @@ export const BOOKING_CANCELLED = {
   updatedAt: '2025-12-22T08:00:00Z',
 };
 
-export const GUEST_BOOKINGS = [BOOKING_PENDING, BOOKING_CONFIRMED, BOOKING_CANCELLED];
-export const HOST_BOOKINGS = [BOOKING_PENDING, BOOKING_CONFIRMED];
+const BOOKING_004 = {
+  id: 'booking-004',
+  listingId: 'listing-004',
+  guestId: 'test-user-001',
+  hostId: 'host-001',
+  checkIn: '2026-01-05',
+  checkOut: '2026-01-08',
+  guests: 1,
+  status: 'completed',
+  totalAmount: '330000',
+  platformFee: '20000',
+  cleaningFee: '15000',
+  currency: 'UZS',
+  cancellationPolicy: 'flexible',
+  message: '',
+  paymentId: 'pay-004',
+  checkoutId: '',
+  createdAt: '2025-12-15T10:00:00Z',
+  updatedAt: '2026-01-08T12:00:00Z',
+};
+
+const BOOKING_005 = {
+  id: 'booking-005',
+  listingId: 'listing-005',
+  guestId: 'test-user-001',
+  hostId: 'host-001',
+  checkIn: '2026-04-15',
+  checkOut: '2026-04-18',
+  guests: 3,
+  status: 'payment_pending',
+  totalAmount: '620000',
+  platformFee: '40000',
+  cleaningFee: '35000',
+  currency: 'UZS',
+  cancellationPolicy: 'moderate',
+  message: '',
+  paymentId: '',
+  checkoutId: '',
+  createdAt: '2026-02-21T08:00:00Z',
+  updatedAt: '2026-02-21T09:00:00Z',
+};
+
+const BOOKING_006 = {
+  id: 'booking-006',
+  listingId: 'listing-006',
+  guestId: 'test-user-001',
+  hostId: 'host-001',
+  checkIn: '2026-05-01',
+  checkOut: '2026-05-04',
+  guests: 2,
+  status: 'confirmed',
+  totalAmount: '530000',
+  platformFee: '35000',
+  cleaningFee: '25000',
+  currency: 'UZS',
+  cancellationPolicy: 'flexible',
+  message: '',
+  paymentId: 'pay-006',
+  checkoutId: '',
+  createdAt: '2026-02-18T10:00:00Z',
+  updatedAt: '2026-02-19T08:00:00Z',
+};
+
+const BOOKING_007 = {
+  id: 'booking-007',
+  listingId: 'listing-008',
+  guestId: 'test-user-001',
+  hostId: 'host-002',
+  checkIn: '2026-06-10',
+  checkOut: '2026-06-14',
+  guests: 4,
+  status: 'pending_host_approval',
+  totalAmount: '196000',
+  platformFee: '12000',
+  cleaningFee: '8000',
+  currency: 'KZT',
+  cancellationPolicy: 'moderate',
+  message: 'Excited to visit Kazakhstan!',
+  paymentId: '',
+  checkoutId: '',
+  createdAt: '2026-02-22T10:00:00Z',
+  updatedAt: '2026-02-22T10:00:00Z',
+};
+
+const BOOKING_008 = {
+  id: 'booking-008',
+  listingId: 'listing-009',
+  guestId: 'test-user-001',
+  hostId: 'host-002',
+  checkIn: '2026-07-01',
+  checkOut: '2026-07-05',
+  guests: 2,
+  status: 'confirmed',
+  totalAmount: '152000',
+  platformFee: '10000',
+  cleaningFee: '5000',
+  currency: 'KZT',
+  cancellationPolicy: 'flexible',
+  message: '',
+  paymentId: 'pay-008',
+  checkoutId: '',
+  createdAt: '2026-02-10T08:00:00Z',
+  updatedAt: '2026-02-11T10:00:00Z',
+};
+
+const BOOKING_009 = {
+  id: 'booking-009',
+  listingId: 'listing-010',
+  guestId: 'test-user-001',
+  hostId: 'host-002',
+  checkIn: '2026-03-20',
+  checkOut: '2026-03-23',
+  guests: 1,
+  status: 'rejected',
+  totalAmount: '162000',
+  platformFee: '10000',
+  cleaningFee: '6000',
+  currency: 'KZT',
+  cancellationPolicy: 'moderate',
+  message: '',
+  paymentId: '',
+  checkoutId: '',
+  createdAt: '2026-02-05T08:00:00Z',
+  updatedAt: '2026-02-06T10:00:00Z',
+};
+
+const BOOKING_010 = {
+  id: 'booking-010',
+  listingId: 'listing-011',
+  guestId: 'test-user-001',
+  hostId: 'host-002',
+  checkIn: '2025-12-10',
+  checkOut: '2025-12-12',
+  guests: 1,
+  status: 'completed',
+  totalAmount: '8000',
+  platformFee: '500',
+  cleaningFee: '500',
+  currency: 'KGS',
+  cancellationPolicy: 'flexible',
+  message: '',
+  paymentId: 'pay-010',
+  checkoutId: '',
+  createdAt: '2025-11-20T08:00:00Z',
+  updatedAt: '2025-12-12T12:00:00Z',
+};
+
+const BOOKING_011 = {
+  id: 'booking-011',
+  listingId: 'listing-012',
+  guestId: 'test-user-001',
+  hostId: 'host-002',
+  checkIn: '2026-08-01',
+  checkOut: '2026-08-05',
+  guests: 3,
+  status: 'cancelled_by_host',
+  totalAmount: '21600',
+  platformFee: '1400',
+  cleaningFee: '800',
+  currency: 'KGS',
+  cancellationPolicy: 'moderate',
+  message: '',
+  paymentId: '',
+  checkoutId: '',
+  createdAt: '2026-01-15T08:00:00Z',
+  updatedAt: '2026-01-20T10:00:00Z',
+};
+
+const BOOKING_012 = {
+  id: 'booking-012',
+  listingId: 'listing-013',
+  guestId: 'test-user-001',
+  hostId: 'host-002',
+  checkIn: '2026-09-05',
+  checkOut: '2026-09-08',
+  guests: 2,
+  status: 'confirmed',
+  totalAmount: '960',
+  platformFee: '60',
+  cleaningFee: '40',
+  currency: 'TJS',
+  cancellationPolicy: 'flexible',
+  message: '',
+  paymentId: 'pay-012',
+  checkoutId: '',
+  createdAt: '2026-02-12T08:00:00Z',
+  updatedAt: '2026-02-13T10:00:00Z',
+};
+
+const BOOKING_013 = {
+  id: 'booking-013',
+  listingId: 'listing-015',
+  guestId: 'test-user-001',
+  hostId: 'host-001',
+  checkIn: '2026-10-01',
+  checkOut: '2026-10-05',
+  guests: 4,
+  status: 'pending_host_approval',
+  totalAmount: '2560000',
+  platformFee: '160000',
+  cleaningFee: '80000',
+  currency: 'UZS',
+  cancellationPolicy: 'strict',
+  message: 'Anniversary trip!',
+  paymentId: '',
+  checkoutId: '',
+  createdAt: '2026-02-23T08:00:00Z',
+  updatedAt: '2026-02-23T08:00:00Z',
+};
+
+const BOOKING_014 = {
+  id: 'booking-014',
+  listingId: 'listing-001',
+  guestId: 'test-user-002',
+  hostId: 'host-001',
+  checkIn: '2026-05-10',
+  checkOut: '2026-05-13',
+  guests: 2,
+  status: 'confirmed',
+  totalAmount: '513000',
+  platformFee: '33000',
+  cleaningFee: '30000',
+  currency: 'UZS',
+  cancellationPolicy: 'flexible',
+  message: '',
+  paymentId: 'pay-014',
+  checkoutId: '',
+  createdAt: '2026-02-01T08:00:00Z',
+  updatedAt: '2026-02-02T10:00:00Z',
+};
+
+const BOOKING_015 = {
+  id: 'booking-015',
+  listingId: 'listing-002',
+  guestId: 'test-user-002',
+  hostId: 'host-001',
+  checkIn: '2026-06-01',
+  checkOut: '2026-06-05',
+  guests: 3,
+  status: 'payment_pending',
+  totalAmount: '872000',
+  platformFee: '56000',
+  cleaningFee: '40000',
+  currency: 'UZS',
+  cancellationPolicy: 'moderate',
+  message: '',
+  paymentId: '',
+  checkoutId: '',
+  createdAt: '2026-02-20T08:00:00Z',
+  updatedAt: '2026-02-20T09:00:00Z',
+};
+
+/** 13 bookings where guestId === 'test-user-001'. */
+export const GUEST_BOOKINGS = [
+  BOOKING_PENDING, BOOKING_CONFIRMED, BOOKING_CANCELLED,
+  BOOKING_004, BOOKING_005, BOOKING_006, BOOKING_007,
+  BOOKING_008, BOOKING_009, BOOKING_010, BOOKING_011,
+  BOOKING_012, BOOKING_013,
+];
+
+/** 9 bookings for listings owned by host-001 (listings 001-006, 015). */
+export const HOST_BOOKINGS = [
+  BOOKING_PENDING, BOOKING_CONFIRMED, BOOKING_CANCELLED,
+  BOOKING_004, BOOKING_005, BOOKING_006, BOOKING_013,
+  BOOKING_014, BOOKING_015,
+];
+
+// ---------------------------------------------------------------------------
+// Price previews
+// ---------------------------------------------------------------------------
 
 export const PRICE_PREVIEW_3N = {
   nights: 3,
@@ -182,6 +812,25 @@ export const CHECKOUT_SESSION = {
   sessionId: 'sess-mock-001',
   checkoutUrl: 'https://pay.mashgate.test/checkout/sess-mock-001',
 };
+
+// ---------------------------------------------------------------------------
+// Admin — Webhook endpoint stub
+// ---------------------------------------------------------------------------
+
+/** Matches the Endpoint interface in /admin/webhooks/+page.svelte. */
+export const WEBHOOK_ENDPOINT_STUB = {
+  id: 'wh-001',
+  url: 'https://hooks.example.com/zist',
+  description: 'Zist booking notifications',
+  eventTypes: ['booking.created', 'booking.confirmed'],
+  status: 'active',
+  createdAt: 1735689600, // 2026-01-01T00:00:00Z
+  updatedAt: 1735689600,
+};
+
+// ---------------------------------------------------------------------------
+// Auth fixtures
+// ---------------------------------------------------------------------------
 
 /** Fake JWT payload for the test guest user. */
 export const MOCK_GUEST = {

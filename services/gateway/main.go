@@ -59,6 +59,9 @@ func main() {
 	listingsURL := getenv("LISTINGS_URL", "http://listings:8001")
 	bookingsURL := getenv("BOOKINGS_URL", "http://bookings:8002")
 	paymentsURL := getenv("PAYMENTS_URL", "http://payments:8003")
+	reviewsURL := getenv("REVIEWS_URL", "http://reviews:8004")
+	adminURL := getenv("ADMIN_URL", "http://admin:8005")
+	chatURL := getenv("CHAT_URL", "") // HookLine WebSocket endpoint (optional)
 	webURL := getenv("WEB_URL", "http://web:3000")
 
 	mgIDURL := getenv("MGID_URL", "http://host.docker.internal:9661")
@@ -99,6 +102,13 @@ func main() {
 	mountAPI(r, "listings", proxyTo(listingsURL))
 	mountAPI(r, "bookings", proxyTo(bookingsURL))
 	mountPaymentsAPI(r, proxyTo(paymentsURL))
+	mountAPI(r, "reviews", proxyTo(reviewsURL))
+	mountAPI(r, "admin", proxyTo(adminURL))
+
+	// Chat WebSocket proxy → HookLine (optional; enabled when CHAT_URL is set).
+	if chatURL != "" {
+		mountWSProxy(r, chatURL)
+	}
 
 	// Admin webhook management — routes through Mashgate SDK (mg-events gRPC → HookLine).
 	// Scope check enforced here; Zist never talks to HookLine directly.
@@ -110,8 +120,21 @@ func main() {
 	// SvelteKit frontend — catch-all (all non-API routes)
 	r.Mount("/", proxyTo(webURL))
 
-	// Register Zist's app-scoped permissions with Mashgate (idempotent)
-	go registerZistScopes(mgIDURL, clientID, mgIDAdminToken)
+	// Sync Zist's app-scoped permissions with Mashgate.
+	// Default: non-blocking background sync.
+	// Required mode (`ZIST_SCOPE_SYNC_REQUIRED=true`): fail fast on sync errors.
+	if scopeSyncRequired() {
+		if err := registerZistScopes(mgIDURL, clientID, mgIDAdminToken); err != nil {
+			slog.Error("required scope sync failed", "err", err)
+			os.Exit(1)
+		}
+	} else {
+		go func() {
+			if err := registerZistScopes(mgIDURL, clientID, mgIDAdminToken); err != nil {
+				slog.Warn("scope sync failed (non-required mode)", "err", err)
+			}
+		}()
+	}
 
 	// Generate ephemeral self-signed TLS cert for HTTP/3 (local dev only)
 	cert, err := selfSignedCert()

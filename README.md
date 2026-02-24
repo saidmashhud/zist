@@ -106,6 +106,9 @@ Zist uses **Authorization Code + PKCE** via mgID:
 | `MGID_CLIENT_SECRET` | Gateway | OAuth2 client secret |
 | `MGID_REDIRECT_URI` | Gateway | OAuth2 callback URL |
 | `MGID_ADMIN_TOKEN` | Gateway | Admin token for scope bootstrap |
+| `ZIST_SCOPE_SYNC_ENABLED` | Gateway | Enable app-scope auto-sync at startup (`true` by default) |
+| `ZIST_SCOPE_SYNC_REQUIRED` | Gateway | Fail startup if scope sync fails (`false` by default) |
+| `ZIST_SCOPE_SYNC_ATTEMPTS` | Gateway | Retry attempts for scope sync (default: `5`) |
 | `MASHGATE_API_KEY` | Gateway, Payments | Mashgate API key |
 | `MASHGATE_URL` | Payments | Mashgate base URL |
 | `MASHGATE_WEBHOOK_SECRET` | Payments | Webhook signing secret |
@@ -118,7 +121,7 @@ Zist uses **Authorization Code + PKCE** via mgID:
 - **mgID**: OIDC provider — handles user auth, issues JWTs with app-scoped permissions
 - **mgPay**: Hosted checkout — Payments service creates sessions via Mashgate SDK
 - **mgEvents**: Webhook management — Gateway proxies admin endpoints to mg-events (scope-gated)
-- **Scope bootstrap**: Gateway registers Zist's app-scoped permissions with mgID at startup (idempotent)
+- **Scope auto-sync**: Gateway upserts Zist app scopes from code at startup (idempotent, no auto-delete of orphans)
 
 ## Testing
 

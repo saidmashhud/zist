@@ -11,15 +11,19 @@ type Config struct {
 	ListingsURL     string
 	InternalToken   string
 	FeeGuestPct     float64
+	NotifyURL       string // mgNotify base URL
+	MashgateAPIKey  string // Mashgate API key for mgNotify auth
 }
 
 // LoadConfig reads configuration from environment variables.
 func LoadConfig() *Config {
 	return &Config{
-		Port:          httputil.Getenv("BOOKINGS_PORT", "8002"),
-		DatabaseURL:   httputil.Getenv("DATABASE_URL", "postgres://dev:dev@db:5432/zist?sslmode=disable"),
-		ListingsURL:   httputil.Getenv("LISTINGS_SERVICE_URL", "http://listings:8001"),
-		InternalToken: httputil.Getenv("INTERNAL_TOKEN", ""),
-		FeeGuestPct:   httputil.GetenvFloat("PLATFORM_FEE_GUEST_PCT", 12.0),
+		Port:           httputil.Getenv("BOOKINGS_PORT", "8002"),
+		DatabaseURL:    httputil.Getenv("DATABASE_URL", "postgres://dev:dev@db:5432/zist?sslmode=disable"),
+		ListingsURL:    httputil.Getenv("LISTINGS_SERVICE_URL", "http://listings:8001"),
+		InternalToken:  httputil.Getenv("INTERNAL_TOKEN", ""),
+		FeeGuestPct:    httputil.GetenvFloat("PLATFORM_FEE_GUEST_PCT", 12.0),
+		NotifyURL:      httputil.Getenv("MGNOTIFY_URL", ""),
+		MashgateAPIKey: httputil.Getenv("MASHGATE_API_KEY", ""),
 	}
 }

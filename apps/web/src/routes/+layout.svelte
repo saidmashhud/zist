@@ -1,6 +1,8 @@
 <script lang="ts">
   import '../app.css';
   import type { LayoutData } from './$types';
+  import LocaleSwitcher from '$lib/components/LocaleSwitcher.svelte';
+  import { t } from '$lib/i18n';
 
   let { children, data }: { children: any; data: LayoutData } = $props();
 
@@ -22,33 +24,37 @@
 
       <div class="hidden items-center gap-6 md:flex">
         <a href="/listings" class="text-sm font-medium text-gray-700 hover:text-gray-900">
-          Explore
+          {$t.nav.search}
         </a>
         <a href="/bookings" class="text-sm font-medium text-gray-700 hover:text-gray-900">
-          My trips
+          {$t.nav.bookings}
         </a>
         {#if user}
+          <a href="/chat" class="text-sm font-medium text-gray-700 hover:text-gray-900">
+            Chat
+          </a>
           <a href="/host" class="text-sm font-medium text-gray-700 hover:text-gray-900">
-            Host dashboard
+            {$t.nav.host}
           </a>
         {/if}
       </div>
 
       <div class="flex items-center gap-3">
+        <LocaleSwitcher />
         {#if user}
           <span class="text-sm text-gray-600">{user.email}</span>
           <button
             onclick={signOut}
             class="rounded-full border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
           >
-            Sign out
+            {$t.nav.logout}
           </button>
         {:else}
           <a
             href="/login"
             class="rounded-full border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
           >
-            Sign in
+            {$t.nav.login}
           </a>
         {/if}
       </div>

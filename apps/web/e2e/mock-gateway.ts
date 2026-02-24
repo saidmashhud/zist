@@ -13,15 +13,13 @@ import {
   ALL_LISTINGS,
   HOST_OWN_LISTINGS,
   LISTING_TASHKENT,
-  LISTING_SAMARKAND,
   GUEST_BOOKINGS,
   HOST_BOOKINGS,
   BOOKING_PENDING,
-  BOOKING_CONFIRMED,
-  BOOKING_CANCELLED,
   PRICE_PREVIEW_3N,
   PRICE_PREVIEW_4N,
   CHECKOUT_SESSION,
+  WEBHOOK_ENDPOINT_STUB,
 } from './mock-data.js';
 
 // ---------------------------------------------------------------------------
@@ -38,9 +36,15 @@ function json(res: ServerResponse, status: number, data: unknown): void {
   res.end(body);
 }
 
-function ok(res: ServerResponse): void {
-  res.writeHead(200);
-  res.end();
+function readBody(req: IncomingMessage): Promise<Record<string, unknown>> {
+  return new Promise((resolve, reject) => {
+    let raw = '';
+    req.on('data', chunk => { raw += chunk; });
+    req.on('end', () => {
+      try { resolve(JSON.parse(raw || '{}')); } catch { resolve({}); }
+    });
+    req.on('error', reject);
+  });
 }
 
 function notFound(res: ServerResponse): void {
@@ -58,7 +62,11 @@ function handle(req: IncomingMessage, res: ServerResponse): void {
 
   // CORS preflight
   if (method === 'OPTIONS') {
-    res.writeHead(204, { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET,POST,PATCH,DELETE' });
+    res.writeHead(204, {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET,POST,PUT,PATCH,DELETE',
+      'Access-Control-Allow-Headers': 'Content-Type',
+    });
     res.end();
     return;
   }
@@ -83,6 +91,29 @@ function handle(req: IncomingMessage, res: ServerResponse): void {
     return json(res, 200, { listings: results, total: results.length });
   }
 
+  // POST /api/listings (create)
+  if (method === 'POST' && pathname === '/api/listings') {
+    readBody(req).then(body => {
+      const newListing = {
+        ...LISTING_TASHKENT,
+        id: 'listing-new-001',
+        title: body.title ?? 'New Listing',
+        description: body.description ?? '',
+        city: body.city ?? 'Tashkent',
+        country: body.country ?? 'Uzbekistan',
+        address: body.address ?? '',
+        type: body.type ?? 'apartment',
+        pricePerNight: body.pricePerNight ?? '0',
+        currency: body.currency ?? 'USD',
+        instantBook: body.instantBook ?? false,
+        amenities: body.amenities ?? [],
+        status: 'draft',
+      };
+      json(res, 201, newListing);
+    });
+    return;
+  }
+
   // GET /api/listings (featured)
   if (method === 'GET' && pathname === '/api/listings') {
     return json(res, 200, { listings: ALL_LISTINGS });
@@ -100,7 +131,6 @@ function handle(req: IncomingMessage, res: ServerResponse): void {
     const qp = new URL(rawUrl, 'http://localhost').searchParams;
     const checkIn = qp.get('check_in') ?? qp.get('checkIn') ?? '';
     const checkOut = qp.get('check_out') ?? qp.get('checkOut') ?? '';
-    // Simple night count for preview selection
     const nights = checkIn && checkOut
       ? Math.max(1, Math.round((new Date(checkOut).getTime() - new Date(checkIn).getTime()) / 86_400_000))
       : 3;
@@ -108,13 +138,57 @@ function handle(req: IncomingMessage, res: ServerResponse): void {
     return json(res, 200, { ...preview, nights });
   }
 
-  // PATCH /api/listings/:id
-  const listingIdMatch = pathname.match(/^\/api\/listings\/([^/]+)$/);
-  if (method === 'PATCH' && listingIdMatch) {
-    const id = listingIdMatch[1];
+  // POST /api/listings/:id/publish
+  const publishMatch = pathname.match(/^\/api\/listings\/([^/]+)\/publish$/);
+  if (method === 'POST' && publishMatch) {
+    const id = publishMatch[1];
+    const listing = ALL_LISTINGS.find(l => l.id === id);
+    if (!listing) return notFound(res);
+    return json(res, 200, { ...listing, status: 'active' });
+  }
+
+  // POST /api/listings/:id/unpublish
+  const unpublishMatch = pathname.match(/^\/api\/listings\/([^/]+)\/unpublish$/);
+  if (method === 'POST' && unpublishMatch) {
+    const id = unpublishMatch[1];
     const listing = ALL_LISTINGS.find(l => l.id === id);
     if (!listing) return notFound(res);
     return json(res, 200, { ...listing, status: 'paused' });
+  }
+
+  // POST /api/listings/:id/photos
+  const photosMatch = pathname.match(/^\/api\/listings\/([^/]+)\/photos$/);
+  if (method === 'POST' && photosMatch) {
+    const id = photosMatch[1];
+    const listing = ALL_LISTINGS.find(l => l.id === id);
+    if (!listing) return notFound(res);
+    readBody(req).then(body => {
+      const photo = { id: 'photo-new-001', url: body.url ?? '', caption: body.caption ?? '' };
+      json(res, 200, { ...listing, photos: [...listing.photos, photo] });
+    });
+    return;
+  }
+
+  // DELETE /api/listings/:id/photos/:photoId
+  const photoDeleteMatch = pathname.match(/^\/api\/listings\/([^/]+)\/photos\/([^/]+)$/);
+  if (method === 'DELETE' && photoDeleteMatch) {
+    const id = photoDeleteMatch[1];
+    const listing = ALL_LISTINGS.find(l => l.id === id);
+    if (!listing) return notFound(res);
+    return json(res, 200, { ...listing, photos: [] });
+  }
+
+  // PATCH /api/listings/:id  — merges body
+  // PUT   /api/listings/:id  — full replace (same behaviour in mock)
+  const listingIdMatch = pathname.match(/^\/api\/listings\/([^/]+)$/);
+  if ((method === 'PATCH' || method === 'PUT') && listingIdMatch) {
+    const id = listingIdMatch[1];
+    const listing = ALL_LISTINGS.find(l => l.id === id);
+    if (!listing) return notFound(res);
+    readBody(req).then(body => {
+      json(res, 200, { ...listing, ...body, id });
+    });
+    return;
   }
 
   // GET /api/listings/:id
@@ -162,19 +236,16 @@ function handle(req: IncomingMessage, res: ServerResponse): void {
 
   // POST /api/bookings  (create)
   if (method === 'POST' && pathname === '/api/bookings') {
-    let body = '';
-    req.on('data', chunk => { body += chunk; });
-    req.on('end', () => {
-      const input = JSON.parse(body || '{}');
-      const listing = ALL_LISTINGS.find(l => l.id === input.listingId) ?? LISTING_TASHKENT;
+    readBody(req).then(body => {
+      const listing = ALL_LISTINGS.find(l => l.id === body.listingId) ?? LISTING_TASHKENT;
       const newBooking = {
         ...BOOKING_PENDING,
         id: 'booking-new-001',
-        listingId: input.listingId ?? 'listing-001',
-        checkIn: input.checkIn ?? BOOKING_PENDING.checkIn,
-        checkOut: input.checkOut ?? BOOKING_PENDING.checkOut,
-        guests: input.guests ?? 1,
-        message: input.message ?? '',
+        listingId: body.listingId ?? 'listing-001',
+        checkIn: body.checkIn ?? BOOKING_PENDING.checkIn,
+        checkOut: body.checkOut ?? BOOKING_PENDING.checkOut,
+        guests: body.guests ?? 1,
+        message: body.message ?? '',
         status: listing.instantBook ? 'payment_pending' : 'pending_host_approval',
       };
       json(res, 201, newBooking);
@@ -190,15 +261,21 @@ function handle(req: IncomingMessage, res: ServerResponse): void {
   // ── Payments ──────────────────────────────────────────────────────────────
 
   if (method === 'POST' && pathname === '/api/payments/checkout') {
-    let body = '';
-    req.on('data', chunk => { body += chunk; });
-    req.on('end', () => {
+    readBody(req).then(() => {
       json(res, 201, CHECKOUT_SESSION);
     });
     return;
   }
 
   // ── Auth ──────────────────────────────────────────────────────────────────
+
+  if (method === 'POST' && pathname === '/api/auth/login') {
+    readBody(req).then(() => {
+      // Return 401 — real auth requires mgID OIDC flow
+      json(res, 401, { error: 'Invalid credentials' });
+    });
+    return;
+  }
 
   if (method === 'POST' && pathname === '/api/auth/logout') {
     res.writeHead(200);
@@ -207,8 +284,39 @@ function handle(req: IncomingMessage, res: ServerResponse): void {
   }
 
   if (method === 'GET' && pathname === '/api/auth/me') {
-    // Return 401 — auth is cookie-based, not bearer
     return json(res, 401, { error: 'unauthorized' });
+  }
+
+  // ── Admin — Webhook endpoints ─────────────────────────────────────────────
+
+  // DELETE /api/admin/webhooks/endpoints/:id
+  const webhookDeleteMatch = pathname.match(/^\/api\/admin\/webhooks\/endpoints\/([^/]+)$/);
+  if (method === 'DELETE' && webhookDeleteMatch) {
+    res.writeHead(204);
+    res.end();
+    return;
+  }
+
+  // POST /api/admin/webhooks/endpoints
+  if (method === 'POST' && pathname === '/api/admin/webhooks/endpoints') {
+    readBody(req).then(body => {
+      const endpoint = {
+        ...WEBHOOK_ENDPOINT_STUB,
+        id: 'wh-002',
+        url: (body.url as string) ?? 'https://hooks.example.com/new',
+        description: body.description as string | undefined,
+        eventTypes: Array.isArray(body.eventTypes)
+          ? body.eventTypes as string[]
+          : WEBHOOK_ENDPOINT_STUB.eventTypes,
+      };
+      json(res, 201, endpoint);
+    });
+    return;
+  }
+
+  // GET /api/admin/webhooks/endpoints
+  if (method === 'GET' && pathname === '/api/admin/webhooks/endpoints') {
+    return json(res, 200, { endpoints: [WEBHOOK_ENDPOINT_STUB] });
   }
 
   // ── Default ───────────────────────────────────────────────────────────────
@@ -240,4 +348,15 @@ export async function startMockGateway(port = 9999): Promise<MockGateway> {
         server.close(err => (err ? reject(err) : resolve()))
       ),
   };
+}
+
+// ---------------------------------------------------------------------------
+// Standalone: tsx e2e/mock-gateway.ts
+// ---------------------------------------------------------------------------
+
+import { fileURLToPath } from 'url';
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  startMockGateway(9999).then(gw => {
+    console.log(`[mock-gateway] running on http://localhost:${gw.port} — Ctrl+C to stop`);
+  });
 }

@@ -61,6 +61,9 @@ func (s *server) routes() http.Handler {
 		// Internal (called by bookings service)
 		r.With(internal...).Post("/{id}/availability/book", s.h.MarkDatesBooked)
 		r.With(internal...).Delete("/{id}/availability/book", s.h.UnmarkDatesBooked)
+
+		// Internal (called by reviews service)
+		r.With(internal...).Put("/{id}/rating", s.h.UpdateRating)
 	})
 
 	return r

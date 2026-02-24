@@ -184,12 +184,14 @@ test.describe('Host dashboard — recent bookings', () => {
 // ---------------------------------------------------------------------------
 
 test.describe('Host dashboard — my listings', () => {
-  test('shows all three host listings', async ({ hostPage: page }) => {
+  test('shows host listings', async ({ hostPage: page }) => {
     await page.goto('/host');
 
     await expect(page.getByText('Cozy Apartment in Tashkent')).toBeVisible();
     await expect(page.getByText('Samarkand Historical Suite')).toBeVisible();
     await expect(page.getByText('Bukhara Silk Road Retreat')).toBeVisible();
+    await expect(page.getByText('Tashkent Modern Room')).toBeVisible();
+    await expect(page.getByText('Fergana Valley House')).toBeVisible();
   });
 
   test('listing shows active/paused status', async ({ hostPage: page }) => {

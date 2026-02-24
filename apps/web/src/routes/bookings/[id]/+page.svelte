@@ -187,6 +187,22 @@
     </div>
   </div>
 
+  <!-- Write a review (completed bookings only) -->
+  {#if booking.status === 'completed' && listing}
+    <div class="mb-4 rounded-2xl border border-gray-200 px-6 py-5 flex items-center justify-between">
+      <div>
+        <p class="font-semibold text-gray-900 text-sm">How was your stay?</p>
+        <p class="text-sm text-gray-500 mt-0.5">Share your experience with other travellers.</p>
+      </div>
+      <a
+        href="/listings/{listing.id}/reviews?bookingId={booking.id}&hostId={listing.hostId}"
+        class="rounded-xl bg-[#ff5a5f] px-5 py-2 text-sm font-semibold text-white hover:bg-[#e84f54] transition-colors"
+      >
+        Write a review
+      </a>
+    </div>
+  {/if}
+
   <!-- Cancel -->
   {#if canCancel}
     <div class="rounded-2xl border border-gray-200 px-6 py-5">

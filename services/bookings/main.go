@@ -51,7 +51,8 @@ func main() {
 	}
 
 	lc := handler.NewListingsClient(cfg.ListingsURL, cfg.InternalToken)
-	h := handler.New(store.New(db), lc, cfg.FeeGuestPct)
+	h := handler.New(store.New(db), lc, cfg.FeeGuestPct).
+		WithNotify(cfg.NotifyURL, cfg.MashgateAPIKey)
 	srv := &server{cfg: cfg, h: h}
 
 	slog.Info("Bookings service starting", "port", cfg.Port)

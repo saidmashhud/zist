@@ -9,6 +9,8 @@ use (
 	./services/listings
 	./services/bookings
 	./services/payments
+	./services/reviews
+	./services/admin
 	./tests/e2e
 )
 

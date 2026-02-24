@@ -44,6 +44,9 @@ services:
       LISTINGS_URL: "http://listings:8001"
       BOOKINGS_URL: "http://bookings:8002"
       PAYMENTS_URL: "http://payments:8003"
+      REVIEWS_URL: "http://reviews:8004"
+      ADMIN_URL: "http://admin:8005"
+      CHAT_URL: "${HOOKLINE_WS_URL:-}"
       WEB_URL: "http://web:3000"
       # mgID OAuth2/OIDC integration — set these in .env or override here
       MGID_URL: "${MGID_URL:-http://host.docker.internal:9661}"
@@ -53,12 +56,15 @@ services:
       MGID_ADMIN_TOKEN: "${MGID_ADMIN_TOKEN:-}"
       MASHGATE_API_KEY: "${MASHGATE_API_KEY:?MASHGATE_API_KEY is required}"
       SESSION_SECRET: "${SESSION_SECRET:?SESSION_SECRET is required}"
+      HOOKLINE_WS_URL: "${HOOKLINE_WS_URL:-}"
       OTEL_EXPORTER_OTLP_ENDPOINT: "${OTEL_EXPORTER_OTLP_ENDPOINT:-}"
       OTEL_EXPORTER_OTLP_INSECURE: "${OTEL_EXPORTER_OTLP_INSECURE:-true}"
     depends_on:
       - listings
       - bookings
       - payments
+      - reviews
+      - admin
       - web
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -156,6 +162,57 @@ services:
       retries: 3
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    networks:
+      - zist-network
+
+  reviews:
+    build:
+      context: .
+      dockerfile: services/reviews/Dockerfile
+    container_name: zist-reviews
+    environment:
+      REVIEWS_PORT: "8004"
+      DATABASE_URL: "postgres://dev:dev@db:5432/zist?sslmode=disable"
+      LISTINGS_SERVICE_URL: "http://listings:8001"
+      INTERNAL_TOKEN: "${INTERNAL_TOKEN:?INTERNAL_TOKEN is required}"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "${OTEL_EXPORTER_OTLP_ENDPOINT:-}"
+      OTEL_EXPORTER_OTLP_INSECURE: "${OTEL_EXPORTER_OTLP_INSECURE:-true}"
+    ports:
+      - "8004:8004"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8004/healthz || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - zist-network
+
+  admin:
+    build:
+      context: .
+      dockerfile: services/admin/Dockerfile
+    container_name: zist-admin
+    environment:
+      ADMIN_PORT: "8005"
+      DATABASE_URL: "postgres://dev:dev@db:5432/zist?sslmode=disable"
+      INTERNAL_TOKEN: "${INTERNAL_TOKEN:?INTERNAL_TOKEN is required}"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "${OTEL_EXPORTER_OTLP_ENDPOINT:-}"
+      OTEL_EXPORTER_OTLP_INSECURE: "${OTEL_EXPORTER_OTLP_INSECURE:-true}"
+    ports:
+      - "8005:8005"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8005/healthz || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
     networks:
       - zist-network
 
