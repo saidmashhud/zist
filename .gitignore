@@ -22,6 +22,7 @@ services/listings/listings
 services/bookings/bookings
 services/payments/payments
 gateway/gateway
+services/gateway/gateway
 
 # Environment
 .env
@@ -35,6 +36,10 @@ apps/web/test-results/
 # OS
 .DS_Store
 Thumbs.db
+
+# Python cache
+__pycache__/
+*.pyc
 
 # Editor
 .vscode/
