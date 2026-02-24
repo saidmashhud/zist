@@ -1,0 +1,32 @@
+groups:
+  - name: zist-slo
+    rules:
+      - alert: ZistServiceDown
+        expr: probe_success{job="zist-blackbox"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          team: zist
+        annotations:
+          summary: "Zist service down: {{ $labels.service }}"
+          description: "Blackbox probe to {{ $labels.instance }} failed for at least 2 minutes."
+
+      - alert: ZistProbeLatencyP95High
+        expr: quantile_over_time(0.95, probe_duration_seconds{job="zist-blackbox"}[10m]) > 1.0
+        for: 10m
+        labels:
+          severity: warning
+          team: zist
+        annotations:
+          summary: "High p95 probe latency: {{ $labels.service }}"
+          description: "p95 probe duration exceeded 1s for 10 minutes."
+
+      - alert: ZistProbeFlapping
+        expr: changes(probe_success{job="zist-blackbox"}[10m]) > 4
+        for: 5m
+        labels:
+          severity: warning
+          team: zist
+        annotations:
+          summary: "Probe flapping: {{ $labels.service }}"
+          description: "Service health probe changed state more than 4 times within 10 minutes."

@@ -30,7 +30,9 @@ services:
 
   gateway:
     build:
-      context: ./services/gateway
+      # Build context is personal/ root — gateway needs Mashgate SDK + internal/auth
+      context: ..
+      dockerfile: zist/services/gateway/Dockerfile
     container_name: zist-gateway
     ports:
       - "8000:8000"        # HTTP/1.1 + HTTP/2
@@ -49,7 +51,10 @@ services:
       MGID_CLIENT_SECRET: "${MGID_CLIENT_SECRET:-}"
       MGID_REDIRECT_URI: "${MGID_REDIRECT_URI:-http://localhost:8000/api/auth/callback}"
       MGID_ADMIN_TOKEN: "${MGID_ADMIN_TOKEN:-}"
-      SESSION_SECRET: "${SESSION_SECRET:-change-me-in-production}"
+      MASHGATE_API_KEY: "${MASHGATE_API_KEY:?MASHGATE_API_KEY is required}"
+      SESSION_SECRET: "${SESSION_SECRET:?SESSION_SECRET is required}"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "${OTEL_EXPORTER_OTLP_ENDPOINT:-}"
+      OTEL_EXPORTER_OTLP_INSECURE: "${OTEL_EXPORTER_OTLP_INSECURE:-true}"
     depends_on:
       - listings
       - bookings
@@ -72,11 +77,17 @@ services:
 
   listings:
     build:
-      context: ./services/listings
+      context: .
+      dockerfile: services/listings/Dockerfile
     container_name: zist-listings
     environment:
       LISTINGS_PORT: "8001"
       DATABASE_URL: "postgres://dev:dev@db:5432/zist?sslmode=disable"
+      INTERNAL_TOKEN: "${INTERNAL_TOKEN:?INTERNAL_TOKEN is required}"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "${OTEL_EXPORTER_OTLP_ENDPOINT:-}"
+      OTEL_EXPORTER_OTLP_INSECURE: "${OTEL_EXPORTER_OTLP_INSECURE:-true}"
+    ports:
+      - "8001:8001"
     depends_on:
       db:
         condition: service_healthy
@@ -91,11 +102,17 @@ services:
 
   bookings:
     build:
-      context: ./services/bookings
+      context: .
+      dockerfile: services/bookings/Dockerfile
     container_name: zist-bookings
     environment:
       BOOKINGS_PORT: "8002"
       DATABASE_URL: "postgres://dev:dev@db:5432/zist?sslmode=disable"
+      INTERNAL_TOKEN: "${INTERNAL_TOKEN:?INTERNAL_TOKEN is required}"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "${OTEL_EXPORTER_OTLP_ENDPOINT:-}"
+      OTEL_EXPORTER_OTLP_INSECURE: "${OTEL_EXPORTER_OTLP_INSECURE:-true}"
+    ports:
+      - "8002:8002"
     depends_on:
       db:
         condition: service_healthy
@@ -111,16 +128,26 @@ services:
   payments:
     build:
       # Build context is personal/ root so the Mashgate SDK local replace can be resolved
-      context: ../..
+      context: ..
       dockerfile: zist/services/payments/Dockerfile
     container_name: zist-payments
     environment:
       PAYMENTS_PORT: "8003"
       # Mashgate runs independently — point to its Envoy gateway
       MASHGATE_URL: "${MASHGATE_URL:-http://host.docker.internal:9661}"
-      MASHGATE_API_KEY: "${MASHGATE_API_KEY:-}"
-      MASHGATE_WEBHOOK_SECRET: "${MASHGATE_WEBHOOK_SECRET:-}"
+      MASHGATE_API_KEY: "${MASHGATE_API_KEY:?MASHGATE_API_KEY is required}"
+      MASHGATE_WEBHOOK_SECRET: "${MASHGATE_WEBHOOK_SECRET:?MASHGATE_WEBHOOK_SECRET is required}"
       BOOKINGS_URL: "http://bookings:8002"
+      INTERNAL_TOKEN: "${INTERNAL_TOKEN:?INTERNAL_TOKEN is required}"
+      # Persistent webhook dedup — shares the Zist DB
+      DATABASE_URL: "postgres://dev:dev@db:5432/zist?sslmode=disable"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "${OTEL_EXPORTER_OTLP_ENDPOINT:-}"
+      OTEL_EXPORTER_OTLP_INSECURE: "${OTEL_EXPORTER_OTLP_INSECURE:-true}"
+    ports:
+      - "8003:8003"
+    depends_on:
+      db:
+        condition: service_healthy
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8003/healthz || exit 1"]
@@ -140,12 +167,15 @@ services:
     build:
       context: ./apps/web
     container_name: zist-web
+    ports:
+      - "3000:3000"
     environment:
       PORT: "3000"
       HOST: "0.0.0.0"
       # ORIGIN tells SvelteKit where the site lives so SSR fetch() resolves correctly.
       # For local dev the gateway is at http://gateway:8000 (internal) or http://localhost:8000 (external).
       ORIGIN: "http://gateway:8000"
+      NODE_OPTIONS: "--max-old-space-size=256"
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000 || exit 1"]

@@ -19,6 +19,7 @@ var zistScopes = []struct {
 	{"zist.bookings.read", "View own bookings"},
 	{"zist.bookings.manage", "Create and manage bookings"},
 	{"zist.payments.create", "Initiate payment checkout"},
+	{"zist.webhooks.manage", "Manage webhook endpoint configuration"},
 }
 
 // registerZistScopes idempotently registers Zist's app-scoped permissions

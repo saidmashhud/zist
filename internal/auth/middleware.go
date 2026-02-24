@@ -86,6 +86,24 @@ func RequireAuth(next http.Handler) http.Handler {
 	})
 }
 
+// RequireInternalToken returns a middleware that validates an X-Internal-Token
+// header against the expected token. Returns 403 Forbidden on mismatch.
+// Used to protect service-to-service routes (e.g. booking mutations called by payments).
+func RequireInternalToken(token string) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			got := r.Header.Get("X-Internal-Token")
+			if token == "" || got == "" || got != token {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusForbidden)
+				w.Write([]byte(`{"error":"forbidden","code":"INVALID_INTERNAL_TOKEN"}`)) //nolint:errcheck
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
 // RequireScope returns a middleware that responds 403 Forbidden if the
 // authenticated principal does not hold the given scope.
 // It implicitly requires authentication — anonymous requests receive 401.

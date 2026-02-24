@@ -9,7 +9,7 @@ package mashgate
 import (
 	"os"
 
-	mg "github.com/saidmashhud/mashgate/packages/sdk/go"
+	mg "github.com/saidmashhud/mashgate/packages/sdk-go"
 )
 
 // NewFromEnv creates a Mashgate client from environment variables:
