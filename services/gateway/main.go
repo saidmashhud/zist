@@ -10,7 +10,7 @@
 //	/api/auth/*      → Mashgate SDK auth (login, logout, refresh, me)
 //	/api/listings/*  → listings service  (strips /api prefix)
 //	/api/bookings/*  → bookings service  (strips /api prefix)
-//	/api/payments/*  → payments service  (strips /api prefix)
+//	/api/payments/*  → payments service  (strips /api/payments prefix)
 //	/*               → SvelteKit frontend (web)
 package main
 
@@ -95,11 +95,10 @@ func main() {
 	// Auth routes via Mashgate SDK (login, logout, refresh, me)
 	mountAuth(r, mg)
 
-	// API routes — /api prefix is stripped before forwarding so upstreams
-	// see their own path space: /listings/*, /bookings/*, /payments/*
+	// API routes — listings/bookings keep service prefixes; payments expects root paths.
 	mountAPI(r, "listings", proxyTo(listingsURL))
 	mountAPI(r, "bookings", proxyTo(bookingsURL))
-	mountAPI(r, "payments", proxyTo(paymentsURL))
+	mountPaymentsAPI(r, proxyTo(paymentsURL))
 
 	// Admin webhook management — routes through Mashgate SDK (mg-events gRPC → HookLine).
 	// Scope check enforced here; Zist never talks to HookLine directly.
@@ -168,6 +167,14 @@ func mountAPI(r chi.Router, name string, h http.Handler) {
 	stripped := http.StripPrefix("/api", h)
 	r.Handle("/api/"+name, stripped)
 	r.Handle("/api/"+name+"/*", stripped)
+}
+
+// mountPaymentsAPI registers /api/payments* routes and strips full service prefix
+// so payments receives root paths: /checkout, /refund, /webhooks/mashgate.
+func mountPaymentsAPI(r chi.Router, h http.Handler) {
+	stripped := http.StripPrefix("/api/payments", h)
+	r.Handle("/api/payments", stripped)
+	r.Handle("/api/payments/*", stripped)
 }
 
 func proxyTo(target string) http.Handler {
