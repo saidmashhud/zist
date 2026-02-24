@@ -35,6 +35,16 @@ func (h *Handler) ConfirmBooking(w http.ResponseWriter, r *http.Request) {
 		httputil.WriteError(w, http.StatusNotFound, "booking not found or not in payment_pending status")
 		return
 	}
+
+	// Fire-and-forget: notify guest of confirmation via mgNotify.
+	// The notify service accepts a user_id and resolves contact info via mgID.
+	if h.Notify != nil {
+		if b, err2 := h.Store.Get(r.Context(), tenantID, id); err2 == nil {
+			msg := "Your Zist booking is confirmed! Check-in: " + b.CheckIn + ", Check-out: " + b.CheckOut + "."
+			go h.Notify.NotifyUser(r.Context(), b.GuestID, "booking_confirmed", msg)
+		}
+	}
+
 	w.WriteHeader(http.StatusNoContent)
 }
 

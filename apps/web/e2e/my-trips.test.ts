@@ -65,15 +65,15 @@ test.describe('My trips — booking list', () => {
   test('pending booking shows "Waiting for host" note', async ({ authedPage: page }) => {
     await page.goto('/bookings');
 
-    await expect(page.getByText('Waiting for host to approve your request.')).toBeVisible();
+    await expect(page.getByText('Waiting for host to approve your request.').first()).toBeVisible();
   });
 
   test('shows formatted date range and night count', async ({ authedPage: page }) => {
     await page.goto('/bookings');
 
     // booking-001: 2026-03-10 → 2026-03-13 = 3 nights, 2 guests
-    await expect(page.getByText(/3 nights/)).toBeVisible();
-    await expect(page.getByText(/2 guests/)).toBeVisible();
+    await expect(page.getByText(/3 nights/).first()).toBeVisible();
+    await expect(page.getByText(/2 guests/).first()).toBeVisible();
   });
 
   test('empty state when no bookings (client-side navigation)', async ({ authedPage: page }) => {

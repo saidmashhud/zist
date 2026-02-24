@@ -50,7 +50,8 @@ func main() {
 
 	s := &server{
 		cfg: cfg,
-		h:   handler.New(store.New(db), cfg.PlatformFeeGuestPct),
+		h: handler.New(store.New(db), cfg.PlatformFeeGuestPct).
+			WithAnalytics(cfg.MgLogsURL, cfg.MashgateAPIKey),
 	}
 
 	slog.Info("listings service starting", "port", cfg.Port)

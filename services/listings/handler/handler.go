@@ -10,18 +10,26 @@ import (
 	"github.com/go-chi/chi/v5"
 	zistauth "github.com/saidmashhud/zist/internal/auth"
 	httputil "github.com/saidmashhud/zist/internal/httputil"
+	"github.com/saidmashhud/zist/services/listings/analytics"
 	"github.com/saidmashhud/zist/services/listings/store"
 )
 
 // Handler holds dependencies shared across all listing HTTP handlers.
 type Handler struct {
 	Store       *store.Store
+	Analytics   *analytics.Client
 	FeeGuestPct float64 // e.g. 12.0 → 12%
 }
 
 // New creates a Handler with the given store and platform fee percentage.
 func New(s *store.Store, feeGuestPct float64) *Handler {
-	return &Handler{Store: s, FeeGuestPct: feeGuestPct}
+	return &Handler{Store: s, FeeGuestPct: feeGuestPct, Analytics: analytics.New("", "")}
+}
+
+// WithAnalytics attaches an mgLogs analytics client.
+func (h *Handler) WithAnalytics(baseURL, apiKey string) *Handler {
+	h.Analytics = analytics.New(baseURL, apiKey)
+	return h
 }
 
 // requireOwner verifies the authenticated user is the listing's host.

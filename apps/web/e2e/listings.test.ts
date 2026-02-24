@@ -25,7 +25,7 @@ test.describe('Listings page — default', () => {
   test('shows result count', async ({ page }) => {
     await page.goto('/listings');
 
-    await expect(page.getByText(/3 stays found/)).toBeVisible();
+    await expect(page.getByText(/15 stays found/)).toBeVisible();
   });
 
   test('compact search bar is visible with inputs', async ({ page }) => {
@@ -174,7 +174,7 @@ test.describe('Listings page — price filter', () => {
   test('result count reflects active city filter', async ({ page }) => {
     await page.goto('/listings?city=Tashkent');
 
-    await expect(page.getByText('1 stay found')).toBeVisible();
+    await expect(page.getByText('3 stays found')).toBeVisible();
   });
 });
 

@@ -350,6 +350,15 @@ func (s *Store) GetHostIDForTenant(ctx context.Context, tenantID, id string) (st
 	return hostID, err
 }
 
+// UpdateRating sets average_rating and review_count for a listing.
+// Called by the reviews service after a new review is submitted.
+func (s *Store) UpdateRating(ctx context.Context, listingID string, avg float64, count int) error {
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE listings SET average_rating=$1, review_count=$2, updated_at=$3 WHERE id=$4`,
+		avg, count, time.Now().Unix(), listingID)
+	return err
+}
+
 // GetPricingInfo returns price-relevant fields for price preview calculation.
 func (s *Store) GetPricingInfo(ctx context.Context, id string) (pricePerNight, cleaningFee, currency string, minNights, maxNights int, err error) {
 	err = s.db.QueryRowContext(ctx,
