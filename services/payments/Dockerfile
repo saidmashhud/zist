@@ -1,17 +1,22 @@
-# Build context must be set to the root of personal/ so that both zist/ and mashgate/ are available.
-# In docker-compose, set: build: { context: ../.., dockerfile: zist/services/payments/Dockerfile }
-FROM golang:1.22-alpine AS build
+# Build context: personal/ root (context: .. in docker-compose)
+# Payments needs Mashgate SDK + internal/auth + internal/dedup
+FROM golang:1.24-alpine AS build
 WORKDIR /workspace
 
 # Copy Mashgate SDK (local replace directive target)
-COPY mashgate/packages/sdk/go /workspace/mashgate-sdk
+COPY mashgate/packages/sdk-go /workspace/mashgate-sdk
+
+# Copy internal modules
+COPY zist/internal/auth /workspace/auth
+COPY zist/internal/dedup /workspace/dedup
+COPY zist/internal/httputil /workspace/httputil
 
 # Copy payments service
 COPY zist/services/payments /workspace/payments
 
-# Create a go.work that wires the local SDK
+# Create a go.work that wires all local replaces
 WORKDIR /workspace/payments
-RUN printf 'go 1.22\nuse .\nreplace github.com/saidmashhud/mashgate/packages/sdk/go => /workspace/mashgate-sdk\n' > /workspace/payments/go.work
+RUN printf 'go 1.24\nuse .\nreplace github.com/saidmashhud/mashgate/packages/sdk-go => /workspace/mashgate-sdk\nreplace github.com/saidmashhud/zist/internal/auth => /workspace/auth\nreplace github.com/saidmashhud/zist/internal/dedup => /workspace/dedup\nreplace github.com/saidmashhud/zist/internal/httputil => /workspace/httputil\n' > go.work
 RUN go mod download
 RUN CGO_ENABLED=0 go build -o /payments .
 

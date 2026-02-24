@@ -1,0 +1,43 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Build output
+.svelte-kit/
+**/.svelte-kit/
+build/
+dist/
+.artifacts/
+
+# Local backups
+backups/
+*.sql.gz
+
+# Go binaries
+/bookings
+/gateway
+/listings
+/payments
+services/listings/listings
+services/bookings/bookings
+services/payments/payments
+gateway/gateway
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Playwright
+apps/web/playwright-report/
+apps/web/test-results/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo

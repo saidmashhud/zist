@@ -4,12 +4,10 @@ declare global {
   namespace App {
     interface Locals {
       user?: {
-        sub: string;
+        user_id: string;
         email: string;
-        name?: string;
         tenant_id: string;
-        roles: string[];
-        scope: string;
+        scopes: string;
       };
     }
   }

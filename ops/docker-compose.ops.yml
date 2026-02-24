@@ -1,0 +1,89 @@
+services:
+  blackbox:
+    image: prom/blackbox-exporter:v0.25.0
+    container_name: zist-blackbox
+    command: ["--config.file=/etc/blackbox_exporter/config.yml"]
+    volumes:
+      - ./ops/blackbox/blackbox.yml:/etc/blackbox_exporter/config.yml:ro
+    ports:
+      - "9115:9115"
+    restart: unless-stopped
+    networks:
+      - zist-network
+
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    container_name: zist-prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.enable-lifecycle"
+    volumes:
+      - ./ops/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./ops/prometheus/alert_rules.yml:/etc/prometheus/alert_rules.yml:ro
+      - zist_prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    depends_on:
+      - blackbox
+    restart: unless-stopped
+    networks:
+      - zist-network
+
+  tempo:
+    image: grafana/tempo:2.6.0
+    container_name: zist-tempo
+    command: ["-config.file=/etc/tempo/tempo.yml"]
+    volumes:
+      - ./ops/tempo/tempo.yml:/etc/tempo/tempo.yml:ro
+      - zist_tempo_data:/var/tempo
+    ports:
+      - "3200:3200"
+    restart: unless-stopped
+    networks:
+      - zist-network
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.111.0
+    container_name: zist-otel-collector
+    command: ["--config=/etc/otel/collector.yml"]
+    volumes:
+      - ./ops/otel/collector.yml:/etc/otel/collector.yml:ro
+    ports:
+      - "4317:4317"
+    depends_on:
+      - tempo
+    restart: unless-stopped
+    networks:
+      - zist-network
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    container_name: zist-grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ./ops/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./ops/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./ops/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - zist_grafana_data:/var/lib/grafana
+    ports:
+      - "3001:3000"
+    depends_on:
+      - prometheus
+      - tempo
+    restart: unless-stopped
+    networks:
+      - zist-network
+
+volumes:
+  zist_prometheus_data:
+  zist_tempo_data:
+  zist_grafana_data:
+
+networks:
+  zist-network:
+    external: true
+    name: zist_network

@@ -27,6 +27,11 @@
         <a href="/bookings" class="text-sm font-medium text-gray-700 hover:text-gray-900">
           My trips
         </a>
+        {#if user}
+          <a href="/host" class="text-sm font-medium text-gray-700 hover:text-gray-900">
+            Host dashboard
+          </a>
+        {/if}
       </div>
 
       <div class="flex items-center gap-3">
@@ -40,7 +45,7 @@
           </button>
         {:else}
           <a
-            href="/api/auth/login"
+            href="/login"
             class="rounded-full border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
           >
             Sign in

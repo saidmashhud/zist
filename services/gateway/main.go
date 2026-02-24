@@ -7,7 +7,7 @@
 // Advertises HTTP/3 via Alt-Svc header on every HTTP/1.1 response.
 // Routes:
 //
-//	/api/auth/*      → mgID OIDC flow (login, callback, logout, me)
+//	/api/auth/*      → Mashgate SDK auth (login, logout, refresh, me)
 //	/api/listings/*  → listings service  (strips /api prefix)
 //	/api/bookings/*  → bookings service  (strips /api prefix)
 //	/api/payments/*  → payments service  (strips /api prefix)
@@ -15,6 +15,7 @@
 package main
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -35,36 +36,41 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/quic-go/quic-go/http3"
+	mashgate "github.com/saidmashhud/mashgate/packages/sdk-go"
+	zistauth "github.com/saidmashhud/zist/internal/auth"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
 func main() {
+	shutdownOTel, err := setupOpenTelemetry(context.Background(), "zist-gateway")
+	if err != nil {
+		slog.Error("failed to initialize OpenTelemetry", "err", err)
+		os.Exit(1)
+	}
+	defer func() {
+		if err := shutdownOTel(context.Background()); err != nil {
+			slog.Warn("OpenTelemetry shutdown failed", "err", err)
+		}
+	}()
+
 	httpPort := getenv("GATEWAY_PORT", "8000")
-	tlsPort  := getenv("GATEWAY_TLS_PORT", "8443")
+	tlsPort := getenv("GATEWAY_TLS_PORT", "8443")
 
 	listingsURL := getenv("LISTINGS_URL", "http://listings:8001")
 	bookingsURL := getenv("BOOKINGS_URL", "http://bookings:8002")
 	paymentsURL := getenv("PAYMENTS_URL", "http://payments:8003")
-	webURL      := getenv("WEB_URL", "http://web:3000")
+	webURL := getenv("WEB_URL", "http://web:3000")
 
-	mgIDURL     := getenv("MGID_URL", "http://host.docker.internal:9661")
-	clientID    := getenv("MGID_CLIENT_ID", "zist-local")
-	clientSecret := getenv("MGID_CLIENT_SECRET", "")
-	redirectURI := getenv("MGID_REDIRECT_URI", "http://localhost:8000/api/auth/callback")
+	mgIDURL := getenv("MGID_URL", "http://host.docker.internal:9661")
+	clientID := getenv("MGID_CLIENT_ID", "zist-local")
 	mgIDAdminToken := getenv("MGID_ADMIN_TOKEN", "")
-	hooklineURL := getenv("HOOKLINE_URL", "http://hookline:8080")
-	hooklineKey := getenv("HOOKLINE_API_KEY", "dev-secret")
-
-	oidcCfg := oidcConfig{
-		mgIDURL:      mgIDURL,
-		clientID:     clientID,
-		clientSecret: clientSecret,
-		redirectURI:  redirectURI,
-	}
+	mashgateAPIKey := getenv("MASHGATE_API_KEY", "")
 
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.RequestID)
+	r.Use(otelhttp.NewMiddleware("zist-gateway"))
 
 	// Advertise HTTP/3 on every response so browsers upgrade automatically
 	r.Use(func(next http.Handler) http.Handler {
@@ -77,14 +83,17 @@ func main() {
 
 	// Auth propagation: validate session cookie → inject X-User-* headers
 	// Runs on all /api/* requests (strips injection, sets headers from mgID).
-	r.Use(propagateAuth(mgIDURL, sessionCookieName))
+	r.Use(propagateAuth(mgIDURL, clientID, sessionCookieName))
 
 	r.Get("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprint(w, "ok")
 	})
 
-	// OIDC auth routes (handled locally, not proxied)
-	mountOIDC(r, oidcCfg)
+	// Mashgate SDK client — shared by auth routes and webhook admin.
+	mg := mashgate.New(mgIDURL, mashgateAPIKey).WithEvents(mashgate.EventsConfig{})
+
+	// Auth routes via Mashgate SDK (login, logout, refresh, me)
+	mountAuth(r, mg)
 
 	// API routes — /api prefix is stripped before forwarding so upstreams
 	// see their own path space: /listings/*, /bookings/*, /payments/*
@@ -92,15 +101,17 @@ func main() {
 	mountAPI(r, "bookings", proxyTo(bookingsURL))
 	mountAPI(r, "payments", proxyTo(paymentsURL))
 
-	// Admin webhook management — proxied to HookLine with API key injection.
-	// Requires zist.webhooks.manage scope (enforced at gateway level).
-	r.Handle("/api/admin/webhooks", adminWebhookProxy(hooklineURL, hooklineKey))
-	r.Handle("/api/admin/webhooks/*", adminWebhookProxy(hooklineURL, hooklineKey))
+	// Admin webhook management — routes through Mashgate SDK (mg-events gRPC → HookLine).
+	// Scope check enforced here; Zist never talks to HookLine directly.
+	webhookHandler := mashgateWebhookAdmin(mg)
+	webhookScope := zistauth.RequireScope("zist.webhooks.manage")
+	r.With(webhookScope).Handle("/api/admin/webhooks", webhookHandler)
+	r.With(webhookScope).Handle("/api/admin/webhooks/*", webhookHandler)
 
 	// SvelteKit frontend — catch-all (all non-API routes)
 	r.Mount("/", proxyTo(webURL))
 
-	// Register Zist's app-scoped permissions with mgID (idempotent)
+	// Register Zist's app-scoped permissions with Mashgate (idempotent)
 	go registerZistScopes(mgIDURL, clientID, mgIDAdminToken)
 
 	// Generate ephemeral self-signed TLS cert for HTTP/3 (local dev only)
@@ -134,8 +145,17 @@ func main() {
 		}
 	}()
 
+	httpServer := &http.Server{
+		Addr:              ":" + httpPort,
+		Handler:           r,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       60 * time.Second,
+	}
+
 	// HTTP/1.1+2 in foreground
-	if err := http.ListenAndServe(":"+httpPort, r); err != nil {
+	if err := httpServer.ListenAndServe(); err != nil {
 		slog.Error("HTTP server error", "err", err)
 		os.Exit(1)
 	}
@@ -156,6 +176,7 @@ func proxyTo(target string) http.Handler {
 		panic(fmt.Sprintf("invalid proxy target %q: %v", target, err))
 	}
 	proxy := httputil.NewSingleHostReverseProxy(u)
+	proxy.Transport = otelhttp.NewTransport(http.DefaultTransport)
 	proxy.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
 		slog.Warn("proxy error", "target", target, "path", r.URL.Path, "err", err)
 		http.Error(w, "upstream unavailable", http.StatusBadGateway)
@@ -196,35 +217,9 @@ func selfSignedCert() (tls.Certificate, error) {
 	}
 
 	certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: certDER})
-	keyPEM  := pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: keyDER})
+	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: keyDER})
 
 	return tls.X509KeyPair(certPEM, keyPEM)
-}
-
-// adminWebhookProxy creates a reverse proxy to HookLine that:
-//   - strips /api/admin/webhooks prefix → /v1/... (HookLine native paths)
-//   - injects the HookLine API key as Authorization header
-func adminWebhookProxy(hooklineURL, hooklineKey string) http.Handler {
-	u, err := url.Parse(hooklineURL)
-	if err != nil {
-		panic(fmt.Sprintf("invalid hookline URL %q: %v", hooklineURL, err))
-	}
-	proxy := httputil.NewSingleHostReverseProxy(u)
-	proxy.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
-		slog.Warn("hookline proxy error", "path", r.URL.Path, "err", err)
-		http.Error(w, "webhook service unavailable", http.StatusBadGateway)
-	}
-	stripped := http.StripPrefix("/api/admin/webhooks", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Map /endpoints/... → /v1/endpoints/...
-		if r.URL.Path == "" || r.URL.Path == "/" {
-			r.URL.Path = "/v1/endpoints"
-		} else {
-			r.URL.Path = "/v1" + r.URL.Path
-		}
-		r.Header.Set("Authorization", "Bearer "+hooklineKey)
-		proxy.ServeHTTP(w, r)
-	}))
-	return stripped
 }
 
 func getenv(key, fallback string) string {
