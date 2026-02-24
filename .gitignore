@@ -8,6 +8,7 @@ node_modules/
 build/
 dist/
 .artifacts/
+.baseline/
 
 # Local backups
 backups/
