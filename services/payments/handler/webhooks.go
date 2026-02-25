@@ -21,8 +21,8 @@ func (h *Handler) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Canonical HookLine/Mashgate headers.
-	timestamp := r.Header.Get("x-gp-timestamp")
-	signature := r.Header.Get("x-gp-signature")
+	timestamp := r.Header.Get("x-hl-timestamp")
+	signature := r.Header.Get("x-hl-signature")
 	// Backward-compatible fallback for legacy emitters.
 	if timestamp == "" {
 		timestamp = r.Header.Get("X-Webhook-Timestamp")

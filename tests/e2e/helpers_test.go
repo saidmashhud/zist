@@ -172,8 +172,8 @@ func webhookHeaders(body []byte) map[string]string {
 	mac := hmac.New(sha256.New, []byte(secret))
 	mac.Write([]byte(ts + "." + string(body)))
 	return map[string]string{
-		"x-gp-timestamp": ts,
-		"x-gp-signature": "v1=" + hex.EncodeToString(mac.Sum(nil)),
+		"x-hl-timestamp": ts,
+		"x-hl-signature": "v1=" + hex.EncodeToString(mac.Sum(nil)),
 	}
 }
 
