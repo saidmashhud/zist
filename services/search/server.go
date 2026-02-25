@@ -7,7 +7,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	zistauth "github.com/saidmashhud/zist/internal/auth"
-	"github.com/saidmashhud/zist/services/payments/handler"
+	"github.com/saidmashhud/zist/services/search/handler"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
@@ -21,18 +21,21 @@ func (s *server) routes() http.Handler {
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.RequestID)
-	r.Use(otelhttp.NewMiddleware("zist-payments"))
+	r.Use(otelhttp.NewMiddleware("zist-search"))
 	r.Use(zistauth.Middleware)
 
 	r.Get("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprint(w, "ok")
 	})
 
-	internal := zistauth.RequireServiceAuth(s.cfg.InternalToken, nil)
+	internal := chi.Chain(zistauth.RequireServiceAuth(s.cfg.InternalToken, nil))
 
-	r.With(zistauth.RequireScope("zist.payments.create")).Post("/checkout", s.h.CreateCheckout)
-	r.With(internal).Post("/refund", s.h.CreateRefund)
-	r.Post("/webhooks/mashgate", s.h.HandleWebhook)
+	r.Route("/search", func(r chi.Router) {
+		r.Get("/", s.h.Search)
+
+		// Internal: update listing location (called by listings service on create/update)
+		r.With(internal...).Put("/locations/{id}", s.h.UpdateLocation)
+	})
 
 	return r
 }

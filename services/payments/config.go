@@ -13,6 +13,11 @@ type Config struct {
 	BookingsURL   string
 	InternalToken string
 	DatabaseURL   string
+
+	// Service JWT auth (optional; if set, JWT is preferred over InternalToken)
+	AuthServiceURL  string
+	AuthServiceKey  string
+	ServiceName     string
 }
 
 // LoadConfig reads configuration from environment variables.
@@ -25,5 +30,9 @@ func LoadConfig() *Config {
 		BookingsURL:   httputil.Getenv("BOOKINGS_URL", "http://bookings:8002"),
 		InternalToken: httputil.Getenv("INTERNAL_TOKEN", ""),
 		DatabaseURL:   httputil.Getenv("DATABASE_URL", ""),
+
+		AuthServiceURL: httputil.Getenv("AUTH_SERVICE_URL", ""),
+		AuthServiceKey: httputil.Getenv("AUTH_SERVICE_KEY", ""),
+		ServiceName:    httputil.Getenv("SERVICE_NAME", "zist-payments"),
 	}
 }

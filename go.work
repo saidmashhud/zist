@@ -11,9 +11,10 @@ use (
 	./services/payments
 	./services/reviews
 	./services/admin
+	./services/search
 	./tests/e2e
 )
 
 // Resolve the Mashgate SDK local replace directive for all workspace modules.
 // Assumes personal/mashgate and personal/zist are siblings.
-replace github.com/saidmashhud/mashgate/packages/sdk-go => ../mashgate/packages/sdk-go
+replace github.com/saidmashhud/mashgate/packages/sdk-go => ../mashgate/sdk/go

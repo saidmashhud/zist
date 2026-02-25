@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 
 	zistauth "github.com/saidmashhud/zist/internal/auth"
@@ -17,11 +18,25 @@ type Handler struct {
 	Store         *store.Store
 	ListingsURL   string
 	InternalToken string
+	TokenClient   *zistauth.ServiceTokenClient
 }
 
 // New creates a Handler.
-func New(s *store.Store, listingsURL, internalToken string) *Handler {
-	return &Handler{Store: s, ListingsURL: listingsURL, InternalToken: internalToken}
+func New(s *store.Store, listingsURL, internalToken string, tokenClient *zistauth.ServiceTokenClient) *Handler {
+	return &Handler{Store: s, ListingsURL: listingsURL, InternalToken: internalToken, TokenClient: tokenClient}
+}
+
+// setAuth sets the appropriate auth header on the request.
+func (h *Handler) setAuth(req *http.Request) {
+	if h.TokenClient != nil {
+		tok, err := h.TokenClient.Token()
+		if err == nil {
+			req.Header.Set("Authorization", "Bearer "+tok)
+			return
+		}
+		slog.Warn("service JWT fetch failed, falling back to X-Internal-Token", "err", err)
+	}
+	req.Header.Set("X-Internal-Token", h.InternalToken)
 }
 
 // updateListingStats fires an internal call to the listings service to
@@ -37,7 +52,7 @@ func (h *Handler) updateListingStats(listingID string, avg float64, count int) {
 		return
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-Internal-Token", h.InternalToken)
+	h.setAuth(req)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return

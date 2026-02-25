@@ -28,7 +28,7 @@ func (s *server) routes() http.Handler {
 		fmt.Fprint(w, "ok")
 	})
 
-	internal := chi.Chain(zistauth.RequireInternalToken(s.cfg.InternalToken))
+	internal := chi.Chain(zistauth.RequireServiceAuth(s.cfg.InternalToken, nil))
 	guestAuth := chi.Chain(zistauth.RequireAuth, zistauth.RequireScope("zist.bookings.manage"))
 	readAuth := chi.Chain(zistauth.RequireAuth, zistauth.RequireScope("zist.bookings.read"))
 	hostAuth := chi.Chain(zistauth.RequireAuth, zistauth.RequireScope("zist.listings.manage"))

@@ -5,10 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
 
+	zistauth "github.com/saidmashhud/zist/internal/auth"
 	"github.com/saidmashhud/zist/services/bookings/domain"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
@@ -17,19 +19,35 @@ import (
 type ListingsClient struct {
 	baseURL       string
 	internalToken string
+	tokenClient   *zistauth.ServiceTokenClient
 	hc            *http.Client
 }
 
 // NewListingsClient creates a client for the listings service.
-func NewListingsClient(baseURL, internalToken string) *ListingsClient {
+// If tokenClient is non-nil, JWT auth is preferred with X-Internal-Token as fallback.
+func NewListingsClient(baseURL, internalToken string, tokenClient *zistauth.ServiceTokenClient) *ListingsClient {
 	return &ListingsClient{
 		baseURL:       strings.TrimRight(baseURL, "/"),
 		internalToken: internalToken,
+		tokenClient:   tokenClient,
 		hc: &http.Client{
 			Timeout:   5 * time.Second,
 			Transport: otelhttp.NewTransport(http.DefaultTransport),
 		},
 	}
+}
+
+// setAuth sets the appropriate auth header on the request.
+func (c *ListingsClient) setAuth(req *http.Request) {
+	if c.tokenClient != nil {
+		tok, err := c.tokenClient.Token()
+		if err == nil {
+			req.Header.Set("Authorization", "Bearer "+tok)
+			return
+		}
+		slog.Warn("service JWT fetch failed, falling back to X-Internal-Token", "err", err)
+	}
+	req.Header.Set("X-Internal-Token", c.internalToken)
 }
 
 // GetListing fetches listing details. Returns (nil, nil) when not found.
@@ -100,7 +118,7 @@ func (c *ListingsClient) MarkDatesBooked(ctx context.Context, tenantID, listingI
 		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-Internal-Token", c.internalToken)
+	c.setAuth(req)
 	req.Header.Set("X-Tenant-ID", tenantID)
 
 	resp, err := c.hc.Do(req)
@@ -133,7 +151,7 @@ func (c *ListingsClient) ReleaseDates(ctx context.Context, tenantID, listingID, 
 		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-Internal-Token", c.internalToken)
+	c.setAuth(req)
 	req.Header.Set("X-Tenant-ID", tenantID)
 
 	resp, err := c.hc.Do(req)

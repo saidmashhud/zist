@@ -6,10 +6,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
 
+	zistauth "github.com/saidmashhud/zist/internal/auth"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
@@ -17,19 +19,36 @@ import (
 type BookingsClient struct {
 	baseURL       string
 	internalToken string
+	tokenClient   *zistauth.ServiceTokenClient
 	hc            *http.Client
 }
 
 // NewBookingsClient creates a client for the bookings service.
-func NewBookingsClient(baseURL, internalToken string) *BookingsClient {
+// If tokenClient is non-nil, JWT auth is preferred with X-Internal-Token as fallback.
+func NewBookingsClient(baseURL, internalToken string, tokenClient *zistauth.ServiceTokenClient) *BookingsClient {
 	return &BookingsClient{
 		baseURL:       strings.TrimRight(baseURL, "/"),
 		internalToken: internalToken,
+		tokenClient:   tokenClient,
 		hc: &http.Client{
 			Timeout:   5 * time.Second,
 			Transport: otelhttp.NewTransport(http.DefaultTransport),
 		},
 	}
+}
+
+// setAuth sets the appropriate auth header on the request.
+// Prefers JWT if ServiceTokenClient is configured, falls back to X-Internal-Token.
+func (c *BookingsClient) setAuth(req *http.Request) {
+	if c.tokenClient != nil {
+		tok, err := c.tokenClient.Token()
+		if err == nil {
+			req.Header.Set("Authorization", "Bearer "+tok)
+			return
+		}
+		slog.Warn("service JWT fetch failed, falling back to X-Internal-Token", "err", err)
+	}
+	req.Header.Set("X-Internal-Token", c.internalToken)
 }
 
 // ConfirmBooking calls the bookings service to mark a booking as confirmed.
@@ -56,7 +75,7 @@ func (c *BookingsClient) SetCheckoutID(ctx context.Context, tenantID, bookingID,
 		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-Internal-Token", c.internalToken)
+	c.setAuth(req)
 	req.Header.Set("X-Tenant-ID", tenantID)
 	resp, err := c.hc.Do(req)
 	if err != nil {
@@ -86,7 +105,7 @@ func (c *BookingsClient) post(ctx context.Context, tenantID, path string, body [
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
-	req.Header.Set("X-Internal-Token", c.internalToken)
+	c.setAuth(req)
 	req.Header.Set("X-Tenant-ID", tenantID)
 	resp, err := c.hc.Do(req)
 	if err != nil {
