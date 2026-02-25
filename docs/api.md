@@ -284,6 +284,262 @@ Auth: none (signature-verified internally). Processes payment events and trigger
 
 ---
 
+## Reviews Service
+
+Base URL: `/api/reviews` (via gateway) or `:8004/reviews` (direct)
+
+### List Reviews for Listing
+
+```
+GET /reviews/listing/:id
+```
+
+Public. Returns reviews for a listing, paginated.
+
+**Query:** `?limit=50`
+
+**Response 200:**
+```json
+{
+  "reviews": [
+    {
+      "id": "uuid",
+      "bookingId": "booking-uuid",
+      "listingId": "listing-uuid",
+      "guestId": "user-uuid",
+      "hostId": "host-uuid",
+      "rating": 5,
+      "comment": "Great place to stay!",
+      "reply": "Thank you for visiting!",
+      "createdAt": 1740000000,
+      "updatedAt": 1740000000
+    }
+  ]
+}
+```
+
+### Create Review
+
+```
+POST /reviews
+```
+
+Auth: Authenticated user. One review per booking (deduplicated by `bookingId`).
+
+**Request:**
+```json
+{
+  "bookingId": "booking-uuid",
+  "listingId": "listing-uuid",
+  "hostId": "host-uuid",
+  "rating": 5,
+  "comment": "Great place to stay!"
+}
+```
+
+**Response 201:** Created review.
+**Response 409:** Review already exists for this booking.
+
+On create: fires internal `PUT /listings/{id}/rating` to update aggregate rating.
+
+### List My Reviews
+
+```
+GET /reviews/my
+```
+
+Auth: Authenticated user. Returns reviews written by the current user.
+
+### Reply to Review
+
+```
+POST /reviews/:id/reply
+```
+
+Auth: Authenticated user (host). Adds a host reply to an existing review.
+
+**Request:**
+```json
+{ "reply": "Thank you for your feedback!" }
+```
+
+---
+
+## Admin Service
+
+Base URL: `/api/admin` (via gateway) or `:8005/admin` (direct)
+
+All endpoints require `zist.admin` scope.
+
+### List Feature Flags
+
+```
+GET /admin/flags
+```
+
+**Response 200:**
+```json
+[
+  {
+    "id": "uuid",
+    "name": "instant_book_v2",
+    "enabled": true,
+    "rollout": 25,
+    "tenantId": null,
+    "createdAt": 1740000000,
+    "updatedAt": 1740000000
+  }
+]
+```
+
+### Create/Update Feature Flag
+
+```
+POST /admin/flags
+```
+
+**Request:**
+```json
+{
+  "name": "instant_book_v2",
+  "enabled": true,
+  "rollout": 25,
+  "tenantId": null
+}
+```
+
+### List Audit Log
+
+```
+GET /admin/audit
+```
+
+**Query:** `?actor_id=user-uuid&limit=100`
+
+**Response 200:**
+```json
+[
+  {
+    "id": "uuid",
+    "actorId": "user-uuid",
+    "action": "flag.update",
+    "resource": "instant_book_v2",
+    "detail": "enabled=true, rollout=25",
+    "tenantId": "tenant-uuid",
+    "createdAt": 1740000000
+  }
+]
+```
+
+### Get Tenant Config
+
+```
+GET /admin/tenants/:id
+```
+
+**Response 200:**
+```json
+{
+  "tenantId": "uuid",
+  "platformFeePct": 12.0,
+  "maxListings": 50,
+  "verified": true,
+  "createdAt": 1740000000,
+  "updatedAt": 1740000000
+}
+```
+
+### Update Tenant Config
+
+```
+PUT /admin/tenants/:id
+```
+
+**Request:**
+```json
+{
+  "platformFeePct": 15.0,
+  "maxListings": 100,
+  "verified": true
+}
+```
+
+---
+
+## Search Service
+
+Base URL: `/api/search` (via gateway) or `:8006/search` (direct)
+
+### Search Listings
+
+```
+GET /search
+```
+
+Public. Supports full geospatial and attribute-based filtering.
+
+**Query Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `city` | string | Filter by city name |
+| `lat` | float | Latitude for geo search |
+| `lng` | float | Longitude for geo search |
+| `radius_km` | float | Radius in km (requires lat/lng) |
+| `check_in` | date | Check-in date (YYYY-MM-DD) |
+| `check_out` | date | Check-out date (YYYY-MM-DD) |
+| `guests` | int | Minimum guest capacity |
+| `type` | string | Property type |
+| `min_price` | string | Minimum price per night |
+| `max_price` | string | Maximum price per night |
+| `amenities` | string | Comma-separated amenity list |
+| `instant_book` | bool | Only instant-bookable listings |
+| `sort_by` | string | `rating`, `price`, or `distance` |
+| `limit` | int | Results per page |
+| `offset` | int | Pagination offset |
+
+**Response 200:**
+```json
+{
+  "listings": [
+    {
+      "id": "uuid",
+      "title": "Cozy Apartment in Tashkent",
+      "city": "Tashkent",
+      "country": "UZ",
+      "type": "apartment",
+      "pricePerNight": "250000.00",
+      "currency": "UZS",
+      "maxGuests": 4,
+      "instantBook": true,
+      "averageRating": 4.8,
+      "reviewCount": 12,
+      "coverPhoto": "https://...",
+      "amenities": ["wifi", "parking"],
+      "distanceKm": 2.3
+    }
+  ],
+  "total": 45,
+  "limit": 20,
+  "offset": 0
+}
+```
+
+### Update Location Index (internal)
+
+```
+PUT /search/locations/:id
+```
+
+Auth: `X-Internal-Token`. Called by Listings service on create/update.
+
+**Request:**
+```json
+{ "lat": 41.2995, "lng": 69.2401 }
+```
+
+---
+
 ## Error Codes
 
 | HTTP Status | Meaning |
