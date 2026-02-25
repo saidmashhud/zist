@@ -31,7 +31,7 @@ func (s *server) routes() http.Handler {
 	})
 
 	hostWrite := chi.Chain(zistauth.RequireAuth, zistauth.RequireScope("zist.listings.manage"))
-	internal := chi.Chain(zistauth.RequireInternalToken(s.cfg.InternalToken))
+	internal := chi.Chain(zistauth.RequireServiceAuth(s.cfg.InternalToken, nil))
 
 	r.Route("/listings", func(r chi.Router) {
 		// Public

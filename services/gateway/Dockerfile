@@ -1,10 +1,11 @@
 # Build context: personal/ root (context: .. in docker-compose)
 # Gateway needs both Mashgate SDK and internal/auth
 FROM golang:1.24-alpine AS build
+RUN apk add --no-cache git
 WORKDIR /workspace
 
 # Copy Mashgate SDK (local replace directive target)
-COPY mashgate/packages/sdk-go /workspace/mashgate-sdk
+COPY mashgate/sdk/go /workspace/mashgate-sdk
 
 # Copy internal auth module
 COPY zist/internal/auth /workspace/auth
@@ -15,7 +16,7 @@ COPY zist/services/gateway /workspace/gateway
 
 WORKDIR /workspace/gateway
 RUN printf 'go 1.24\nuse .\nreplace github.com/saidmashhud/mashgate/packages/sdk-go => /workspace/mashgate-sdk\nreplace github.com/saidmashhud/zist/internal/auth => /workspace/auth\nreplace github.com/saidmashhud/zist/internal/httputil => /workspace/httputil\n' > go.work
-RUN go mod download
+RUN GOPROXY=direct go mod download
 RUN CGO_ENABLED=0 go build -o /gateway .
 
 FROM alpine:3.19

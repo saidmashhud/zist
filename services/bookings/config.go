@@ -13,6 +13,11 @@ type Config struct {
 	FeeGuestPct     float64
 	NotifyURL       string // mgNotify base URL
 	MashgateAPIKey  string // Mashgate API key for mgNotify auth
+
+	// Service JWT auth (optional; if set, JWT is preferred over InternalToken)
+	AuthServiceURL string
+	AuthServiceKey string
+	ServiceName    string
 }
 
 // LoadConfig reads configuration from environment variables.
@@ -25,5 +30,9 @@ func LoadConfig() *Config {
 		FeeGuestPct:    httputil.GetenvFloat("PLATFORM_FEE_GUEST_PCT", 12.0),
 		NotifyURL:      httputil.Getenv("MGNOTIFY_URL", ""),
 		MashgateAPIKey: httputil.Getenv("MASHGATE_API_KEY", ""),
+
+		AuthServiceURL: httputil.Getenv("AUTH_SERVICE_URL", ""),
+		AuthServiceKey: httputil.Getenv("AUTH_SERVICE_KEY", ""),
+		ServiceName:    httputil.Getenv("SERVICE_NAME", "zist-bookings"),
 	}
 }

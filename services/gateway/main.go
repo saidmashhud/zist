@@ -61,6 +61,7 @@ func main() {
 	paymentsURL := getenv("PAYMENTS_URL", "http://payments:8003")
 	reviewsURL := getenv("REVIEWS_URL", "http://reviews:8004")
 	adminURL := getenv("ADMIN_URL", "http://admin:8005")
+	searchURL := getenv("SEARCH_URL", "http://search:8006")
 	chatURL := getenv("CHAT_URL", "") // HookLine WebSocket endpoint (optional)
 	webURL := getenv("WEB_URL", "http://web:3000")
 
@@ -104,6 +105,7 @@ func main() {
 	mountPaymentsAPI(r, proxyTo(paymentsURL))
 	mountAPI(r, "reviews", proxyTo(reviewsURL))
 	mountAPI(r, "admin", proxyTo(adminURL))
+	mountAPI(r, "search", proxyTo(searchURL))
 
 	// Chat WebSocket proxy → HookLine (optional; enabled when CHAT_URL is set).
 	if chatURL != "" {

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	_ "github.com/lib/pq"
+	zistauth "github.com/saidmashhud/zist/internal/auth"
 	"github.com/saidmashhud/zist/services/bookings/handler"
 	"github.com/saidmashhud/zist/services/bookings/store"
 )
@@ -50,7 +51,14 @@ func main() {
 		os.Exit(1)
 	}
 
-	lc := handler.NewListingsClient(cfg.ListingsURL, cfg.InternalToken)
+	// Service JWT client (optional — falls back to X-Internal-Token if not configured)
+	var tokenClient *zistauth.ServiceTokenClient
+	if cfg.AuthServiceURL != "" && cfg.AuthServiceKey != "" {
+		tokenClient = zistauth.NewServiceTokenClient(cfg.AuthServiceURL, cfg.ServiceName, cfg.AuthServiceKey)
+		slog.Info("service JWT auth enabled", "authService", cfg.AuthServiceURL)
+	}
+
+	lc := handler.NewListingsClient(cfg.ListingsURL, cfg.InternalToken, tokenClient)
 	h := handler.New(store.New(db), lc, cfg.FeeGuestPct).
 		WithNotify(cfg.NotifyURL, cfg.MashgateAPIKey)
 	srv := &server{cfg: cfg, h: h}

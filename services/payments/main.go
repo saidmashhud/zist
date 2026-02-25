@@ -11,6 +11,7 @@ import (
 
 	_ "github.com/lib/pq"
 	mashgate "github.com/saidmashhud/mashgate/packages/sdk-go"
+	zistauth "github.com/saidmashhud/zist/internal/auth"
 	"github.com/saidmashhud/zist/internal/dedup"
 	"github.com/saidmashhud/zist/services/payments/handler"
 )
@@ -60,7 +61,15 @@ func main() {
 	}
 
 	mg := mashgate.New(cfg.MashgateURL, cfg.MashgateKey)
-	bc := handler.NewBookingsClient(cfg.BookingsURL, cfg.InternalToken)
+
+	// Service JWT client (optional — falls back to X-Internal-Token if not configured)
+	var tokenClient *zistauth.ServiceTokenClient
+	if cfg.AuthServiceURL != "" && cfg.AuthServiceKey != "" {
+		tokenClient = zistauth.NewServiceTokenClient(cfg.AuthServiceURL, cfg.ServiceName, cfg.AuthServiceKey)
+		slog.Info("service JWT auth enabled", "authService", cfg.AuthServiceURL)
+	}
+
+	bc := handler.NewBookingsClient(cfg.BookingsURL, cfg.InternalToken, tokenClient)
 	h := handler.New(mg, cfg.WebhookSecret, bc, dedupStore)
 	srv := &server{cfg: cfg, h: h}
 

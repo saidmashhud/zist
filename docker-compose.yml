@@ -6,7 +6,7 @@ services:
   # ============================================================================
 
   db:
-    image: postgres:16-alpine
+    image: postgis/postgis:16-3.4-alpine
     container_name: zist-db
     environment:
       POSTGRES_DB: zist
@@ -46,6 +46,7 @@ services:
       PAYMENTS_URL: "http://payments:8003"
       REVIEWS_URL: "http://reviews:8004"
       ADMIN_URL: "http://admin:8005"
+      SEARCH_URL: "http://search:8006"
       CHAT_URL: "${HOOKLINE_WS_URL:-}"
       WEB_URL: "http://web:3000"
       # mgID OAuth2/OIDC integration — set these in .env or override here
@@ -65,6 +66,7 @@ services:
       - payments
       - reviews
       - admin
+      - search
       - web
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -210,6 +212,33 @@ services:
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8005/healthz || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - zist-network
+
+  search:
+    build:
+      context: .
+      dockerfile: services/search/Dockerfile
+    container_name: zist-search
+    environment:
+      SEARCH_PORT: "8006"
+      DATABASE_URL: "postgres://dev:dev@db:5432/zist?sslmode=disable"
+      INTERNAL_TOKEN: "${INTERNAL_TOKEN:?INTERNAL_TOKEN is required}"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "${OTEL_EXPORTER_OTLP_ENDPOINT:-}"
+      OTEL_EXPORTER_OTLP_INSECURE: "${OTEL_EXPORTER_OTLP_INSECURE:-true}"
+    ports:
+      - "8006:8006"
+    depends_on:
+      db:
+        condition: service_healthy
+      listings:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8006/healthz || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 3
