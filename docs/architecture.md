@@ -16,9 +16,10 @@
 │  /api/listings/*       → LISTINGS (:8001)                            │
 │  /api/bookings/*       → BOOKINGS (:8002)                            │
 │  /api/payments/*       → PAYMENTS (:8003)                            │
-│  /api/reviews/*        → REVIEWS  (:8004)           [Stage 2]        │
-│  /api/admin/*          → ADMIN    (:8005)           [Stage 3]        │
-│  /api/chat/*           → HookLine WebSocket proxy   [Stage 2]        │
+│  /api/reviews/*        → REVIEWS  (:8004)                            │
+│  /api/admin/*          → ADMIN    (:8005)                            │
+│  /api/search/*         → SEARCH   (:8006)                            │
+│  /api/chat/*           → HookLine WebSocket proxy                    │
 │  /api/admin/webhooks/* → mgEvents SDK (scope: zist.webhooks.manage)  │
 │  /*                    → WEB (:3000, SvelteKit)                      │
 └──────┬─────────────────┬──────────┬──────────────┬───────────────────┘
@@ -39,18 +40,16 @@
       └───────────────┴─────────────┴──────────────┘
                               │
                               ▼
-                       ┌────────────┐      ┌──────────┐
-                       │ PostgreSQL │      │  ADMIN   │
-                       │   :5433    │◄─────│  :8005   │
-                       │            │      │ Flags    │
-                       │ webhook    │      │ Audit    │
-                       │ dedup      │      │ Tenants  │
-                       └────────────┘      └──────────┘
+                       ┌────────────┐      ┌──────────┐     ┌──────────┐
+                       │ PostgreSQL │      │  ADMIN   │     │  SEARCH  │
+                       │   :5433    │◄─────│  :8005   │     │  :8006   │
+                       │            │      │ Flags    │     │ Geo      │
+                       │ webhook    │      │ Audit    │     │ Filters  │
+                       │ dedup      │      │ Tenants  │     │ Sort     │
+                       └────────────┘      └──────────┘     └──────────┘
 ```
 
-## Stage 2 — Engagement
-
-### Reviews Service (:8004)
+## Reviews Service (:8004)
 - `POST /reviews` — submit review after completed booking (deduplicated by booking_id)
 - `GET /reviews/listing/{id}` — list reviews for a property (public)
 - `GET /reviews/my` — list reviews written by authenticated guest
@@ -72,9 +71,7 @@
 - Requires auth (X-User-ID injected into upstream connection)
 - Enabled when `CHAT_URL` / `HOOKLINE_WS_URL` env var is set
 
-## Stage 3 — Polish
-
-### Admin Service (:8005)
+## Admin Service (:8005)
 - `GET/POST /admin/flags` — feature flag CRUD (requires `zist.admin` scope)
 - `GET /admin/audit` — audit log of admin actions
 - `GET/PUT /admin/tenants/{id}` — per-tenant platform configuration
@@ -82,6 +79,13 @@
 ### mgFlags Integration (in Listings service)
 - `flags.Client` fetches `/v1/flags` with 30s local cache
 - Used for `instant_book_v2`, `search_ranking_ml` feature flags
+
+## Search Service (:8006)
+
+- `GET /search` — full-text and geospatial search with filters (city, lat/lng+radius, dates, guests, price range, amenities, instant book, property type)
+- `PUT /search/locations/{id}` — internal endpoint for Listings service to update location index on create/update
+- Sort by: `rating`, `price`, `distance`
+- Pagination: `limit` + `offset`
 
 ### i18n (SvelteKit)
 - Supported locales: `ru`, `uz`, `en`, `kk`

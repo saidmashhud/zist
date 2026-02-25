@@ -47,6 +47,9 @@ Zist is a full-stack Airbnb-style property rental application that demonstrates 
 | Listings | 8001 | Property listings CRUD |
 | Bookings | 8002 | Booking management + status transitions |
 | Payments | 8003 | Checkout sessions + Mashgate webhooks |
+| Reviews | 8004 | Review management, ratings, host replies |
+| Admin | 8005 | Feature flags, audit log, tenant config |
+| Search | 8006 | Geospatial search, filtering, sorting |
 | Web | 3000 | SvelteKit frontend |
 | PostgreSQL | 5433 | Shared database |
 
