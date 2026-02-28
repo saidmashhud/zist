@@ -133,6 +133,7 @@ test.describe('Edit listing — save', () => {
 test.describe('Edit listing — publish/unpublish', () => {
   test('Pause listing sends POST to /api/listings/listing-001/unpublish', async ({ hostPage: page }) => {
     await page.goto('/host/listings/listing-001/edit');
+    await expect(page.getByRole('button', { name: 'Pause listing' })).toBeVisible();
 
     let unpublishCalled = false;
     await page.route('**/api/listings/listing-001/unpublish', async route => {
@@ -151,8 +152,10 @@ test.describe('Edit listing — publish/unpublish', () => {
       await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ bookings: [] }) });
     });
 
-    const unpublishReq = page.waitForRequest('**/api/listings/listing-001/unpublish');
-    await page.getByRole('button', { name: 'Pause listing' }).dispatchEvent('click');
+    const unpublishReq = page.waitForRequest(req =>
+      req.url().includes('/api/listings/listing-001/unpublish') && req.method() === 'POST'
+    );
+    await page.getByRole('button', { name: 'Pause listing' }).click();
     await unpublishReq;
 
     expect(unpublishCalled).toBe(true);
@@ -160,7 +163,17 @@ test.describe('Edit listing — publish/unpublish', () => {
   });
 
   test('Publish listing sends POST to /api/listings/listing-003/publish', async ({ hostPage: page }) => {
+    await page.route('**/api/listings/listing-003', async route => {
+      if (route.request().method() !== 'GET') { await route.continue(); return; }
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(LISTING_PAUSED),
+      });
+    });
+
     await page.goto('/host/listings/listing-003/edit');
+    await expect(page.getByRole('button', { name: 'Publish listing' })).toBeVisible();
 
     let publishCalled = false;
     await page.route('**/api/listings/listing-003/publish', async route => {
@@ -178,8 +191,10 @@ test.describe('Edit listing — publish/unpublish', () => {
       await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ bookings: [] }) });
     });
 
-    const publishReq = page.waitForRequest('**/api/listings/listing-003/publish');
-    await page.getByRole('button', { name: 'Publish listing' }).dispatchEvent('click');
+    const publishReq = page.waitForRequest(req =>
+      req.url().includes('/api/listings/listing-003/publish') && req.method() === 'POST'
+    );
+    await page.getByRole('button', { name: 'Publish listing' }).click();
     await publishReq;
 
     expect(publishCalled).toBe(true);

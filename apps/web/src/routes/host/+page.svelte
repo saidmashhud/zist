@@ -1,23 +1,47 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import type { PageData } from './$types';
   import StatusBadge from '$lib/components/StatusBadge.svelte';
-  import { fmtDate, fmtAmount } from '$lib/utils';
+  import { fmtDate, fmtAmount, csrfHeaders } from '$lib/utils';
 
   let { data }: { data: PageData } = $props();
+  type HostListing = PageData['listings'][number];
+  type HostBooking = PageData['bookings'][number];
+
+  let listings = $state<HostListing[]>(data.listings ?? []);
+  let bookings = $state<HostBooking[]>(data.bookings ?? []);
 
   const pendingBookings = $derived(
-    data.bookings.filter(b => b.status === 'pending_host_approval')
+    bookings.filter(b => b.status === 'pending_host_approval')
   );
   const activeBookings = $derived(
-    data.bookings.filter(b => b.status === 'confirmed' || b.status === 'payment_pending')
+    bookings.filter(b => b.status === 'confirmed' || b.status === 'payment_pending')
   );
+
+  onMount(async () => {
+    try {
+      const [listingsRes, bookingsRes] = await Promise.all([
+        fetch('/api/listings/mine').catch(() => null),
+        fetch('/api/bookings/host').catch(() => null),
+      ]);
+      listings = listingsRes?.ok
+        ? (((await listingsRes.json()) as { listings?: HostListing[] }).listings ?? [])
+        : [];
+      bookings = bookingsRes?.ok
+        ? (((await bookingsRes.json()) as { bookings?: HostBooking[] }).bookings ?? [])
+        : [];
+    } catch {
+      listings = [];
+      bookings = [];
+    }
+  });
 
   // Approve/reject
   let actioning = $state<string | null>(null);
 
   async function approve(bookingId: string) {
     actioning = bookingId;
-    await fetch(`/api/bookings/${bookingId}/approve`, { method: 'POST' });
+    await fetch(`/api/bookings/${bookingId}/approve`, { method: 'POST', headers: csrfHeaders() });
     actioning = null;
     location.reload();
   }
@@ -25,7 +49,7 @@
   async function reject(bookingId: string) {
     if (!confirm('Decline this booking request?')) return;
     actioning = bookingId;
-    await fetch(`/api/bookings/${bookingId}/reject`, { method: 'POST' });
+    await fetch(`/api/bookings/${bookingId}/reject`, { method: 'POST', headers: csrfHeaders() });
     actioning = null;
     location.reload();
   }
@@ -35,7 +59,7 @@
     const next = current === 'active' ? 'paused' : 'active';
     await fetch(`/api/listings/${listingId}`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...csrfHeaders() },
       body: JSON.stringify({ status: next }),
     });
     location.reload();
@@ -49,18 +73,26 @@
 <div class="mx-auto max-w-5xl px-6 py-10">
   <div class="flex items-center justify-between mb-8">
     <h1 class="text-3xl font-bold text-gray-900">Host dashboard</h1>
-    <a
-      href="/host/listings/new"
-      class="rounded-xl bg-[#ff5a5f] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#e84f54] transition-colors"
-    >
-      + New listing
-    </a>
+    <div class="flex items-center gap-3">
+      <a
+        href="/host/analytics"
+        class="rounded-xl border border-gray-300 px-5 py-2.5 text-sm font-medium text-gray-700 hover:border-gray-400 transition-colors"
+      >
+        Analytics
+      </a>
+      <a
+        href="/host/listings/new"
+        class="rounded-xl bg-[#ff5a5f] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#e84f54] transition-colors"
+      >
+        + New listing
+      </a>
+    </div>
   </div>
 
   <!-- Stats row -->
   <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-10">
     <div class="rounded-2xl border border-gray-200 px-5 py-4">
-      <p class="text-2xl font-bold text-gray-900">{data.listings.filter(l => l.status === 'active').length}</p>
+      <p class="text-2xl font-bold text-gray-900">{listings.filter(l => l.status === 'active').length}</p>
       <p class="text-xs text-gray-500 mt-0.5">Active listings</p>
     </div>
     <div class="rounded-2xl border border-gray-200 px-5 py-4">
@@ -72,7 +104,7 @@
       <p class="text-xs text-gray-500 mt-0.5">Confirmed bookings</p>
     </div>
     <div class="rounded-2xl border border-gray-200 px-5 py-4">
-      <p class="text-2xl font-bold text-gray-900">{data.listings.length}</p>
+      <p class="text-2xl font-bold text-gray-900">{listings.length}</p>
       <p class="text-xs text-gray-500 mt-0.5">Total listings</p>
     </div>
   </div>
@@ -129,13 +161,13 @@
         <a href="/host/bookings" class="text-sm text-[#ff5a5f] hover:underline">View all</a>
       </div>
 
-      {#if data.bookings.length === 0}
+      {#if bookings.length === 0}
         <div class="rounded-2xl border border-gray-200 px-6 py-10 text-center text-sm text-gray-400">
           No bookings yet.
         </div>
       {:else}
         <div class="space-y-2">
-          {#each data.bookings.slice(0, 8) as booking (booking.id)}
+          {#each bookings.slice(0, 8) as booking (booking.id)}
             <a
               href="/host/bookings/{booking.id}"
               class="flex items-center justify-between gap-4 rounded-xl border border-gray-100 px-4 py-3 hover:border-gray-200 hover:bg-gray-50 transition-all"
@@ -163,7 +195,7 @@
         <a href="/host/listings" class="text-sm text-[#ff5a5f] hover:underline">Manage</a>
       </div>
 
-      {#if data.listings.length === 0}
+      {#if listings.length === 0}
         <div class="rounded-2xl border border-gray-200 px-6 py-10 text-center">
           <p class="text-sm text-gray-400">No listings yet.</p>
           <a href="/host/listings/new" class="mt-2 inline-block text-sm font-medium text-[#ff5a5f] hover:underline">
@@ -172,7 +204,7 @@
         </div>
       {:else}
         <div class="space-y-3">
-          {#each data.listings as listing (listing.id)}
+          {#each listings as listing (listing.id)}
             <div class="rounded-2xl border border-gray-200 p-4">
               <div class="flex gap-3">
                 {#if listing.photos && listing.photos.length > 0}
